@@ -27,7 +27,6 @@ volatile IRMsgState IRHVACLink::state = Preamble;
 volatile unsigned long IRHVACLink::timings[RING_BUFFER_SIZE];
 uint8_t *msgReceivedPtr;
 const unsigned char byteMask[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
-const unsigned char byteMaskRev[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
 
 // Received message value pointers
 #define MSGSIZE(samp,msgbits,sync,brk) ((samp) * (2 * (msgbits + ( (brk)>0 ? 1 : 0) ) + (sync)  ))
