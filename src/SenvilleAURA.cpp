@@ -5,6 +5,7 @@
 #include "SenvilleAURA.hpp"
 #include <ArduinoJson.h>
 //#define DEBUG
+#define SHOW_RAWDATA
 
 #define JSON_PARSEBUFFER 100
 
@@ -22,6 +23,7 @@
 #define CMD_MTMP    "MeasTemp"
 #define CMD_MTMP    "MeasTemp"
 #define CMD_OPT     "Opt"
+#define STAT_RAW    "RAW"
 
 unsigned char reverse(unsigned char b) {
     b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
@@ -133,7 +135,7 @@ char *SenvilleAURA::toBuff(char *buf) {
     return buf;
 }
 char *SenvilleAURA::toJsonBuff(char *buf) {
-    int pos = 0;
+    int pos = 0, i;
     sprintf(buf,"");
     switch(this->getInstructionType()) {
         case Instruction::Command:
@@ -145,7 +147,6 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
             APND_CHARBUFF(pos,buf,", "CMD_STMP":%d ", this->getSetTemp())
             APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
             APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
-            APND_CHARBUFF(pos,buf,"}", "")
             break;
         case Instruction::FollowMe:
             APND_CHARBUFF(pos,buf,"{"CMD_ISON":%d ", this->getPowerOn())
@@ -157,16 +158,20 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
             APND_CHARBUFF(pos,buf,", "CMD_STATE":%d ", this->getFollowMeState())
             APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
             APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
-            APND_CHARBUFF(pos,buf,"}", "")
             break;
         default: // An Option
             APND_CHARBUFF(pos,buf,"{"CMD_INSTR":%d ", this->getInstructionType())
             APND_CHARBUFF(pos,buf,", "CMD_OPT":%d ", this->getOption())
             APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
             APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
-            APND_CHARBUFF(pos,buf,"}", "")
             break;
     }
+#ifdef SHOW_RAWDATA
+    APND_CHARBUFF(pos,buf,", "STAT_RAW":0x", "")
+    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
+        APND_CHARBUFF(pos,buf,"%0X ",message[i])
+#endif
+    APND_CHARBUFF(pos,buf,"}", "")
     return buf;
 }
 bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {

@@ -10,6 +10,11 @@
 //#define DEBUG
 
 #define BITSINBYTE 8
+// The LSB of the display toggles between 1/0 with each scan but isn't connected to output
+#define DISPLAY_MASK 0xFE
+
+#define STAT_DISPRAW "disp"
+#define STAT_ONTME  "OnTimeMs"
 
 // Bit/Byte management
 volatile short SenvilleAURADisp::bitPtr;
@@ -63,16 +68,18 @@ void SenvilleAURADisp::listenStop() {
 }
 bool SenvilleAURADisp::hasUpdate() {
     bool newVal = true;
+    // Collects bytes until display array is filled
     if(byteReady) {
         byteReady = false;
         bitPtr = 0;
-        displayBuff[displayPtr % DISPLAY_BYTE_SIZE] = rdByte;
+        displayBuff[displayPtr % DISPLAY_BYTE_SIZE] = rdByte & DISPLAY_MASK;
         displayPtr++;
         if(displayPtr % DISPLAY_BYTE_SIZE == 0) {
             printIt = true;
         }
     }
     if(!printIt) return false;
+    // Test all display bytes for a change
     for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
         newVal = newVal && displayBuff[i] == displayBuffLast[i];
         displayBuffLast[i] = displayBuff[i];
@@ -81,17 +88,16 @@ bool SenvilleAURADisp::hasUpdate() {
     if(!newVal) this->listenStop();
     return !newVal;
 }
+#define APND_CHARBUFF(pos,buf,arg0,arg1) (pos) = strlen(buf); sprintf(&(buf)[(pos)],arg0,arg1);
 char *SenvilleAURADisp::toBuff(char *buf) {
     int pos = 0;
-    sprintf(buf,"{disp: 0x");
+    sprintf(buf,"{"STAT_DISPRAW":0x");
     for(uint8_t ptr = 0; ptr < DISPLAY_BYTE_SIZE; ptr++) {
-        pos = strlen(buf);
-        sprintf(&buf[pos], (displayBuff[ptr]<0x10?"0":"") );
-        pos = strlen(buf);
-        sprintf(&buf[pos], "%0X", displayBuff[ptr] );
+        APND_CHARBUFF(pos,buf,(displayBuff[ptr]<0x10?"0":""), "")
+        APND_CHARBUFF(pos,buf,"%0X", displayBuff[ptr])
+        
     }
-    pos = strlen(buf);
-    sprintf(&buf[pos], "}");
+    APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d }", millis())
     return buf;
 }
 // Read next bit - flag when full byte ready
