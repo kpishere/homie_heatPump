@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include "SenvilleAURA.hpp"
 #include <ArduinoJson.h>
-#define DEBUG
 #define SHOW_RAWDATA
+//#define DEBUG
 
 #define JSON_PARSEBUFFER 100
 
