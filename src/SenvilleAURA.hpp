@@ -87,6 +87,8 @@ private:
 
     uint8_t calcCRC(short _sample);
 
+    void setInstructionType(Instruction instr);
+
 public:
     SenvilleAURA();
     

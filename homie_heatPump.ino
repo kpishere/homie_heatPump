@@ -2,10 +2,10 @@
 #include "src/SenvilleAURADisp.hpp"
 #include "src/IRHVACLink.hpp"
 #include "src/SenvilleAURA.hpp"
-//#define DEBUG
+#define DEBUG
 
 #define FW_NAME "heatpump test"
-#define FW_VERSION "0.0.1"
+#define FW_VERSION "0.0.2"
 
 #define MAX_BUFFLEN 100
 unsigned short maxBuffLen = MAX_BUFFLEN;
@@ -29,8 +29,17 @@ HomieNode controlNode0("heatpump", "hvac");
 HomieSetting<long> updateIntervalSetting("updateInterval", "The update interval in seconds");
 
 void setupHandler() {
-    String strVal = String((const char *)controlBuff);
+    String strVal;
+
+    // Always get update to get sample time
+    senville->toJsonBuff((char *)controlBuff);
+
+    strVal = String((const char *)controlBuff);
     controlNode0.setProperty("control").send(strVal);
+    
+    // Always get update to get sample time
+    disp->toBuff((char *)displayBuff);
+    
     strVal = String((const char *)displayBuff);
     controlNode0.setProperty("display").send(strVal);
 }
@@ -42,8 +51,8 @@ void loopHandler() {
 
   // Check display hardware
   if(disp->hasUpdate()) {
-    disp->toBuff((char *)displayBuff);
 #ifdef DEBUG
+    disp->toBuff((char *)displayBuff);
     Serial.println((const char *)displayBuff);
 #endif
     change = true;
@@ -65,8 +74,8 @@ void loopHandler() {
       senville->toBuff((char *)controlBuff);
       Serial.println((char *)controlBuff);
 #endif 
-      senville->toJsonBuff((char *)controlBuff);
 #ifdef DEBUG
+      senville->toJsonBuff((char *)controlBuff);
       Serial.println((char *)controlBuff);
 #endif
       change = change || true;
@@ -95,6 +104,12 @@ bool propertyHandler(Property prop, const HomieRange& range, const String& value
         Serial.printf("Parsing '%s'\n",value.c_str());
 #endif
       if(senville->fromJsonBuff((char *)value.c_str(), byteMsgBuf)) {
+#ifdef DEBUG
+        Serial.print("Sending message : 0x");
+        for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
+          Serial.printf("%0X ",byteMsgBuf[i]);
+        Serial.println();
+#endif         
         irReceiver->send(byteMsgBuf,true);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
         irReceiver->listen();
       } else {

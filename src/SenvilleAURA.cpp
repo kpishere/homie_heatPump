@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "SenvilleAURA.hpp"
 #include <ArduinoJson.h>
-//#define DEBUG
+#define DEBUG
 #define SHOW_RAWDATA
 
 #define JSON_PARSEBUFFER 100
@@ -23,7 +23,7 @@
 #define CMD_MTMP    "MeasTemp"
 #define CMD_MTMP    "MeasTemp"
 #define CMD_OPT     "Opt"
-#define STAT_RAW    "RAW"
+#define STAT_RAW    "Unknown"
 
 unsigned char reverse(unsigned char b) {
     b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
@@ -159,22 +159,34 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
             APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
             APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
             break;
-        default: // An Option
+        case Instruction::InstrOption:
             APND_CHARBUFF(pos,buf,"{"CMD_INSTR":%d ", this->getInstructionType())
             APND_CHARBUFF(pos,buf,", "CMD_OPT":%d ", this->getOption())
             APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
             APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
             break;
-    }
+        default: // Unsupported
 #ifdef SHOW_RAWDATA
-    APND_CHARBUFF(pos,buf,", "STAT_RAW":0x", "")
-    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
-        APND_CHARBUFF(pos,buf,"%0X ",message[i])
+            APND_CHARBUFF(pos,buf,"{"STAT_RAW":0x", "")
+            for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++) {
+                APND_CHARBUFF(pos,buf,"%0X ",message[i])
+            }
+            APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
+            APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
 #endif
+            break;
+    }
     APND_CHARBUFF(pos,buf,"}", "")
     return buf;
 }
 bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
+    bool isOn, slp;
+    Mode mde;
+    FanSpeed fsp;
+    SenvilleAURA *sFlw, *sOpt;
+    uint8_t mTmp;
+    FollowMeState fms;
+    Option opt;
     Instruction thisInstr;
     DynamicJsonBuffer  jsonBuffer(JSON_PARSEBUFFER);
     JsonObject& root = jsonBuffer.parseObject(buf);
@@ -189,23 +201,24 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
     
     if(root.containsKey(CMD_INSTR)) {
         thisInstr = static_cast<Instruction>(root[CMD_INSTR].as<uint8_t>());
+        this->setInstructionType(Instruction::Command);
         switch(thisInstr) {
             case Instruction::Command:
             case Instruction::FollowMe:
                 if(root.containsKey(CMD_ISON)) {
-                    bool isOn = root[CMD_ISON].as<bool>();
+                    isOn = root[CMD_ISON].as<bool>();
                     this->setPowerOn(isOn);
                 }
                 if(root.containsKey(CMD_MODE)) {
-                    Mode mde = static_cast<Mode>(root[CMD_MODE].as<uint8_t>());
+                    mde = static_cast<Mode>(root[CMD_MODE].as<uint8_t>());
                     this->setMode(mde);
                 }
                 if(root.containsKey(CMD_FSPD)) {
-                    FanSpeed fsp = static_cast<FanSpeed>(root[CMD_FSPD].as<uint8_t>());
+                    fsp = static_cast<FanSpeed>(root[CMD_FSPD].as<uint8_t>());
                     this->setFanSpeed(fsp);
                 }
                 if(root.containsKey(CMD_SLP)) {
-                    bool slp = root[CMD_SLP].as<bool>();
+                    slp = root[CMD_SLP].as<bool>();
                     this->setSleepOn(slp);
                 }
                 if(thisInstr == Instruction::Command) {
@@ -217,21 +230,18 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
                     return true;
                 } else {
                     if(root.containsKey(CMD_MTMP) && root.containsKey(CMD_STATE)) {
-                        uint8_t mTmp;
-                        FollowMeState fms;
-
                         mTmp = root[CMD_MTMP].as<uint8_t>();
                         fms = static_cast<FollowMeState>(root[CMD_STATE].as<uint8_t>());
-                        SenvilleAURA *sFlw = this->followMeCmd(this, fms, mTmp);
+                        sFlw = this->followMeCmd(this, fms, mTmp);
                         memmove(sendBuf, sFlw->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
                         return true;
                     }
                 }
                 break;
-            default: // An Option
+            default: // An InstrOption
                 if(root.containsKey(CMD_OPT)) {
-                    Option opt = static_cast<Option>(root[CMD_OPT].as<uint8_t>());
-                    SenvilleAURA *sOpt = this->optionCmd(opt);
+                    opt = static_cast<Option>(root[CMD_OPT].as<uint8_t>());
+                    sOpt = this->optionCmd(opt);
                     memmove(sendBuf, sOpt->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
                     return true;
                 }
@@ -247,6 +257,9 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
 Instruction SenvilleAURA::getInstructionType() {
     return static_cast<Instruction>(message[MSG_CONST_STATE(this->validSamplePtr)] & 0x07);
 }
+void SenvilleAURA::setInstructionType(Instruction instr) {
+    message[MSG_CONST_STATE(this->validSamplePtr)] = 0xA0 | ((uint8_t)instr);
+}
 bool SenvilleAURA::getPowerOn() {
     return 0x80 & message[MSG_CMD_OPT(this->validSamplePtr)];
 }
@@ -260,16 +273,16 @@ Mode SenvilleAURA::getMode() {
 }
 void SenvilleAURA::setMode(Mode val) {
     message[MSG_CMD_OPT(this->validSamplePtr)] &= 0xF8;
-    message[MSG_CMD_OPT(this->validSamplePtr)] |= val & 0x07;
+    message[MSG_CMD_OPT(this->validSamplePtr)] |= (0x07 & (uint8_t)val);
 }
 FanSpeed SenvilleAURA::getFanSpeed() {
     return static_cast<FanSpeed>((message[MSG_CMD_OPT(this->validSamplePtr)] & 0x18) >> 3);
 }
 void SenvilleAURA::setFanSpeed(FanSpeed val) {
     Mode m = this->getMode();
-    if( m == Mode::ModeAuto || m == Mode::Dry ) return;
-    message[MSG_CMD_OPT(this->validSamplePtr)] &= 0x18;
-    message[MSG_CMD_OPT(this->validSamplePtr)] |= (val << 3) & 0x18;
+    if( m == Mode::ModeAuto || m == Mode::Dry ) val = FanSpeed::FanAuto;
+    message[MSG_CMD_OPT(this->validSamplePtr)] &= 0xE7;
+    message[MSG_CMD_OPT(this->validSamplePtr)] |= ((val << 3) & 0x18);
 }
 bool SenvilleAURA::getSleepOn(){
     return message[MSG_CMD_OPT(this->validSamplePtr)] & 0x40;
@@ -287,7 +300,7 @@ Option SenvilleAURA::getOption() {
 SenvilleAURA *SenvilleAURA::optionCmd(Option val) {
     SenvilleAURA *obj = new SenvilleAURA();
     uint8_t *msg = obj->getMessage();
-    msg[MSG_CONST_STATE(0)] = 0xA0 | Instruction::InstrOption;
+    msg[MSG_CONST_STATE(0)] = 0xA0 | (uint8_t)Instruction::InstrOption;
     msg[MSG_CMD_OPT(0)] = val;
     msg[MSG_RUNMODE(0)] = 0xff;
     msg[MSG_TIMESTART(0)] = 0xff;
@@ -323,7 +336,7 @@ FollowMeState SenvilleAURA::getFollowMeState() {
 SenvilleAURA *SenvilleAURA::followMeCmd(SenvilleAURA *fromState, FollowMeState newState,
                                                uint8_t measuredTemp) {
     uint8_t *msg = fromState->getMessage();
-    msg[MSG_CONST_STATE(0)] = 0xA0 | Instruction::FollowMe;
+    msg[MSG_CONST_STATE(0)] = 0xA0 | (uint8_t)Instruction::FollowMe;
     msg[MSG_CMD_OPT(0)] &= 0x10;
     msg[MSG_RUNMODE(0)] |= 0x44;
     msg[MSG_TIMESTART(0)] = newState;
