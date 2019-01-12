@@ -10,6 +10,10 @@
 #define MAX_BUFFLEN 100
 unsigned short maxBuffLen = MAX_BUFFLEN;
 
+typedef enum UpdatePropertyE {
+  None = 0x00, Display = 0x01, UpdateControl = 0x02, All = 0xFF
+} UpdateProperty;
+
 const int DEFAULT_UPDATE_INTERVAL = 180; // 3 min
 
 IRHVACLink *irReceiver;
@@ -19,6 +23,7 @@ uint8_t byteMsgBuf[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
 volatile char *controlBuff;
 volatile char *displayBuff;
 unsigned long lastUpdate = 0;
+volatile uint8_t updateFlags = UpdateProperty::None;
 
 typedef enum PropertyE {
   Control
@@ -31,17 +36,21 @@ HomieSetting<long> updateIntervalSetting("updateInterval", "The update interval 
 void setupHandler() {
     String strVal;
 
-    // Always get update to get sample time
-    senville->toJsonBuff((char *)controlBuff);
-
-    strVal = String((const char *)controlBuff);
-    controlNode0.setProperty("control").send(strVal);
-    
-    // Always get update to get sample time
-    disp->toBuff((char *)displayBuff);
-    
-    strVal = String((const char *)displayBuff);
-    controlNode0.setProperty("display").send(strVal);
+    if(updateFlags & UpdateProperty::UpdateControl) {
+      // Always get update to get sample time
+      senville->toJsonBuff((char *)controlBuff);
+  
+      strVal = String((const char *)controlBuff);
+      controlNode0.setProperty("control").send(strVal);      
+    }
+    if(updateFlags & UpdateProperty::Display) {
+      // Always get update to get sample time
+      disp->toBuff((char *)displayBuff);
+      
+      strVal = String((const char *)displayBuff);
+      controlNode0.setProperty("display").send(strVal);
+    }
+    updateFlags = UpdateProperty::None;
 }
 
 void loopHandler() {
@@ -55,7 +64,7 @@ void loopHandler() {
     disp->toBuff((char *)displayBuff);
     Serial.println((const char *)displayBuff);
 #endif
-    change = true;
+    updateFlags |= UpdateProperty::Display;
     disp->listen();
   }
 
@@ -78,13 +87,16 @@ void loopHandler() {
       senville->toJsonBuff((char *)controlBuff);
       Serial.println((char *)controlBuff);
 #endif
-      change = change || true;
+      updateFlags |= UpdateProperty::UpdateControl;
     }
     irReceiver->listen();
   }
   
   // Update Homie properties
-  if (change || thisUpdate - lastUpdate >= updateIntervalSetting.get() * 1000UL || lastUpdate == 0) {
+  if(thisUpdate - lastUpdate >= updateIntervalSetting.get() * 1000UL || lastUpdate == 0) {
+    updateFlags = UpdateProperty::All;
+  }
+  if (updateFlags) {
     setupHandler();
     lastUpdate = thisUpdate;
   }
@@ -153,6 +165,8 @@ void setup() {
   senville = new SenvilleAURA();
   irReceiver = new IRHVACLink(senville->getIRHVACConfig());
   irReceiver->listen();  
+  updateFlags = UpdateProperty::All;
+  setupHandler();
 }
 
 void loop() {
