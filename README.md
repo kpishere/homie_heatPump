@@ -10,6 +10,8 @@ The project is GPL V2.0 which means I share, you share.  Pull requests are welco
 
 To add your own brand/model of heat pump / AC unit, it is expected that you'd use IRHVACLink class directly, mess with parameters passed to it, then add your own new class, similar to SenvilleAURA class, to encapsulate the specifics of your model.  The SenvilleAURADisp class is still very much in research mode and its applicability/extension for other models remains to be seen.
 
+Check out the wiki for pics. of a test rig. https://github.com/kpishere/homie_heatPump/wiki
+
 ## Overview
 
 This library sports fully independent classes for physical layer communication and logical layer protocol of Send/Receive signals to/from a heat pump for the purposes of replacing the hand-held remote.  There are Arduino *.ino test/example files of using the physical layer classes on their own.  There are other test examples of using the physical+logical layers.  There are also other examples of using Homie (link: https://github.com/marvinroger/homie-esp8266 ) library and framework for home automation, MQTT communication, OTA management, and WiFi configuration management.
