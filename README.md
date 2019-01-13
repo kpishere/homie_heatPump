@@ -1,10 +1,14 @@
 #  Homie Heat Pump
 
-Yet another IR Library for HVAC related systems.  
+Yet another IR Library for HVAC related systems -- with a twist.  The decoding of the display enables automated capture of the internal measurement characteristics of the unit.  You get evaporator intake and coil temperatures, condensor intake and coil temperatures, compressor discharge temperatures, RPM/frequency of compressor, indoor, and outdoor fans, and also TXV angle amongst other measurements.  There are a whole range of units spanning multiple brands that DO NOT have serial ports with this info.  But, these units still have this info, here is how you get it online.
 
-NOTE: This is by no means a complete project.  At best, it is fun experimentation only.  For instance, if the ESP8266 crashes, what is the default heat pump setting?  There isn't one right now.  Use on your equipment is entirely your responsibility.  
+Yes, with these measurements, diagnostics of issues with the unit are as simple as looking at your thermostat.  Also, only thing missing from calculating total efficiency of the unit in real time is a sensor on the current supply.  There are other separate current sensor projects out there, someone is gonna put them together (please let me know if you do!)
 
-The project is GPL V2.0 which means I share, you share.  Pull requests are welcome.
+NOTE: This is by no means a complete project.  At best, it is fun experimentation only.  For instance, if the ESP8266 crashes, what is the default heat pump setting?  There isn't one right now.  Use on your equipment is entirely your responsibility.  This library is currently being used on my heat pump unit BUT, it is still in the research phase.  Use at your own risk. (Note: I've been able to plug and un-plug this board whilst the unit is on witout problems [pics: ])
+
+The project is GPL V2.0 which means I share, you share.  Pull requests are welcome.  For instance, I'd love to get more sample data to verify the undocumented measurements (You'll see what is currently known documented in the header file for SenvilleAURADisp.hpp).  Especially for these reserved codes, there is likely to be some variation across brands so there is work in building up a matrix there.
+
+To add your own brand/model of heat pump / AC unit, it is expected that you'd use IRHVACLink class directly, mess with parameters passed to it, then add your own new class, similar to SenvilleAURA class, to encapsulate the specifics of your model.  The SenvilleAURADisp class is still very much in research mode and its applicability/extension for other models remains to be seen.
 
 ## Overview
 
@@ -43,4 +47,4 @@ Example:
 
 ## Upcoming
 
-You'll notice that the display output is simply the three bytes used to set the display properties.  Decoding these values is still under development.  You may also notice that only one of the LED signal pins is used.  There is limited IO on the ESP8266 and it simply couldn't be fit.  Currently, it is in test form only to confirm that each byte is sent in a regular order from the heat pump CPU thereby requiring only one of these pins as a synchronization pin to decode all three bytes.  In code, the order will be assumed where on the physical display board, it requires all three pins to activate different parts of the circuit.  This presumption remains to be confirmed.
+Will be continuing with monitoring data collection from operation of unit and with validated measurements, adding a property(ies) to the MQTT stream for these values.

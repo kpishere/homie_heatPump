@@ -60,7 +60,7 @@ char displayBytetoAscii(uint8_t b) {
     for(int i=0; i<sizeof(displayLookup); i++ ) {
         if(b == displayLookup[i]) return i;
     }
-    return i;
+    return '?'; // Unmapped values are equated to a Question mark
 }
 //////
 // Class methods
@@ -94,6 +94,7 @@ void SenvilleAURADisp::listenStop() {
 }
 bool SenvilleAURADisp::hasUpdate() {
     bool newVal = true;
+    bool haveSpace = false;
     // Collects bytes until display array is filled
     if(byteReady) {
         byteReady = false;
@@ -104,13 +105,19 @@ bool SenvilleAURADisp::hasUpdate() {
             printIt = true;
         }
     }
-    if(!printIt) return false;
-    // Test all display bytes for a change
+    if(!printIt)    return false;
+    else            printIt = false;
+    // Mask blinking display -- if spaces in it, don't show it
     for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
-        newVal = newVal && displayBuff[i] == displayBuffLast[i];
-        displayBuffLast[i] = displayBuff[i];
+        haveSpace = haveSpace || displayBuff[i] == DISPLAY_MASK;
     }
-    printIt = false;
+    if(!haveSpace) {
+        // Test all display bytes for a change
+        for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
+            newVal = newVal && displayBuff[i] == displayBuffLast[i];
+            displayBuffLast[i] = displayBuff[i];
+        }
+    }
     if(!newVal) this->listenStop();
     return !newVal;
 }
