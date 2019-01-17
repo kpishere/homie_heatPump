@@ -2,7 +2,7 @@
 #include "src/SenvilleAURADisp.hpp"
 #include "src/IRHVACLink.hpp"
 #include "src/SenvilleAURA.hpp"
-#define DEBUG
+//#define DEBUG
 
 #define FW_NAME "heatpump test"
 #define FW_VERSION "0.0.2"

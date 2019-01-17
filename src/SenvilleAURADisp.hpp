@@ -88,6 +88,16 @@
 #define CLK_HSPI D5
 #define DATA_MOSI D7
 
+#define DISP_MAXSTRINGPERCODE 3
+typedef struct displyMapAsciiS {
+    uint8_t dispCode;
+    char asciiVal[DISP_MAXSTRINGPERCODE];
+    displyMapAsciiS(uint8_t code, char ascii[]) {
+        dispCode = code;
+        memcpy(asciiVal,ascii,DISP_MAXSTRINGPERCODE * sizeof(char));
+    }
+} DisplayMapAscii;
+
 class SenvilleAURADisp {
 private:
     static volatile short bitPtr;
@@ -98,6 +108,8 @@ private:
     static volatile uint8_t displayBuffLast[DISPLAY_BYTE_SIZE];
     static volatile bool printIt;
 public:
+    static const DisplayMapAscii displayMap[];
+
     SenvilleAURADisp();
     ~SenvilleAURADisp();
     bool hasUpdate();

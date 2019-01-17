@@ -21,18 +21,6 @@
 #define DISP_CHAR2 1
 #define DISP_LEDS  2
 
-#define DISPLAY2ASCII128 \
- 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, \
- 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, \
- 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, \
- 0x02, 0x9E, 0x24, 0x0C, 0x98, 0x48, 0x40, 0x1E, 0x00, 0x08, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, \
- 0xFF, 0x10, 0xFF, 0x62, 0xFF, 0x60, 0x70, 0xFF, 0x90, 0xF2, 0xFF, 0xFF, 0xE2, 0xFF, 0xFF, 0xFF, \
- 0x30, 0xFF, 0xFF, 0x48, 0x72, 0x82, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, \
- 0xFF, 0xFF, 0xC0, 0xE4, 0x84, 0x20, 0xFF, 0xFF, 0xFF, 0x9E, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xC4, \
- 0xFF, 0xFF, 0xF4, 0xFF, 0xFF, 0xC6, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
-
-char displayLookup[] = { DISPLAY2ASCII128 };
-
 // Bit/Byte management
 volatile short SenvilleAURADisp::bitPtr;
 volatile uint8_t SenvilleAURADisp::rdByte;
@@ -44,6 +32,42 @@ volatile uint8_t SenvilleAURADisp::displayBuffLast[DISPLAY_BYTE_SIZE];
 volatile bool SenvilleAURADisp::printIt;
 volatile uint8_t SenvilleAURADisp::displayPtr;
 
+const DisplayMapAscii SenvilleAURADisp::displayMap[] = {
+      displyMapAsciiS(0xFE, " ")
+    , displyMapAsciiS(0x9C, "-1")
+    , displyMapAsciiS(0xFC, "-")
+    , displyMapAsciiS(0x02, "0")
+    , displyMapAsciiS(0x9E, "1")
+    , displyMapAsciiS(0x24, "2")
+    , displyMapAsciiS(0x0C, "3")
+    , displyMapAsciiS(0x98, "4")
+    , displyMapAsciiS(0x48, "5")
+    , displyMapAsciiS(0x40, "6")
+    , displyMapAsciiS(0x1E, "7")
+    , displyMapAsciiS(0x00, "8")
+    , displyMapAsciiS(0x08, "9")
+    , displyMapAsciiS(0x10, "A")
+    , displyMapAsciiS(0x62, "C")
+    , displyMapAsciiS(0x60, "E")
+    , displyMapAsciiS(0x70, "F")
+    , displyMapAsciiS(0x90, "H")
+    , displyMapAsciiS(0xF2, "I")
+    , displyMapAsciiS(0xE2, "L")
+    , displyMapAsciiS(0x30, "P")
+    , displyMapAsciiS(0x48, "S")
+    , displyMapAsciiS(0x72, "T")
+    , displyMapAsciiS(0x82, "U")
+    , displyMapAsciiS(0xC0, "b")
+    , displyMapAsciiS(0xE4, "c")
+    , displyMapAsciiS(0x84, "d")
+    , displyMapAsciiS(0x20, "e")
+    , displyMapAsciiS(0x9E, "i")
+    , displyMapAsciiS(0xC4, "o")
+    , displyMapAsciiS(0xF4, "r")
+    , displyMapAsciiS(0xC6, "u")
+};
+
+
 // Only one instance of this class is supported, the last
 // class to invoke listen() wins.  First class to exit disables interrupt.
 SenvilleAURADisp *lastInst;
@@ -53,14 +77,13 @@ void ISRDispHandler() {
 void ISRSyncHandler() {
     if(lastInst) lastInst->handleSynch();
 }
-// return display value as 7bit ascii value
-char displayBytetoAscii(uint8_t b) {
-    char val = 0x20;
-    int i;
-    for(int i=0; i<sizeof(displayLookup); i++ ) {
-        if(b == displayLookup[i]) return i;
+// return display value as char* of 7bit ascii string
+const char *displayBytetoAscii(uint8_t b) {
+    for(int i=0; i<( sizeof(SenvilleAURADisp::displayMap)/sizeof(DisplayMapAscii) ); i++ ) {
+        if(b == SenvilleAURADisp::displayMap[i].dispCode)
+            return SenvilleAURADisp::displayMap[i].asciiVal;
     }
-    return '?'; // Unmapped values are equated to a Question mark
+    return "?"; // Unmapped values are equated to a Question mark
 }
 //////
 // Class methods
@@ -94,7 +117,6 @@ void SenvilleAURADisp::listenStop() {
 }
 bool SenvilleAURADisp::hasUpdate() {
     bool newVal = true;
-    bool haveSpace = false;
     // Collects bytes until display array is filled
     if(byteReady) {
         byteReady = false;
@@ -107,16 +129,10 @@ bool SenvilleAURADisp::hasUpdate() {
     }
     if(!printIt)    return false;
     else            printIt = false;
-    // Mask blinking display -- if spaces in it, don't show it
+    // Test all display bytes for a change
     for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
-        haveSpace = haveSpace || displayBuff[i] == DISPLAY_MASK;
-    }
-    if(!haveSpace) {
-        // Test all display bytes for a change
-        for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
-            newVal = newVal && displayBuff[i] == displayBuffLast[i];
-            displayBuffLast[i] = displayBuff[i];
-        }
+        newVal = newVal && displayBuff[i] == displayBuffLast[i];
+        displayBuffLast[i] = displayBuff[i];
     }
     if(!newVal) this->listenStop();
     return !newVal;
@@ -129,8 +145,8 @@ char *SenvilleAURADisp::toBuff(char *buf) {
         APND_CHARBUFF(pos,buf,(displayBuff[ptr]<0x10?"0":""), "")
         APND_CHARBUFF(pos,buf,"%0X", displayBuff[ptr])
     }
-    APND_CHARBUFF(pos,buf,", "STAT_DISP":\"%c", displayBytetoAscii(displayBuff[DISP_CHAR1]))
-    APND_CHARBUFF(pos,buf,"%c\"", displayBytetoAscii(displayBuff[DISP_CHAR2]))
+    APND_CHARBUFF(pos,buf,", "STAT_DISP":\"%s", displayBytetoAscii(displayBuff[DISP_CHAR1]))
+    APND_CHARBUFF(pos,buf,"%s\"", displayBytetoAscii(displayBuff[DISP_CHAR2]))
     APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d }", millis())
     return buf;
 }
