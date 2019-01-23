@@ -117,6 +117,7 @@ void SenvilleAURADisp::listenStop() {
 }
 bool SenvilleAURADisp::hasUpdate() {
     bool newVal = true;
+    uint8_t spaces = 0;
     // Collects bytes until display array is filled
     if(byteReady) {
         byteReady = false;
@@ -133,7 +134,11 @@ bool SenvilleAURADisp::hasUpdate() {
     for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
         newVal = newVal && displayBuff[i] == displayBuffLast[i];
         displayBuffLast[i] = displayBuff[i];
+        // Supress results with spaces -- due to flashing
+        if(i < DISP_LEDS)
+            spaces += (displayBuff[i] == DISPLAY_MASK ? 1 : 0);
     }
+    if(spaces>0) return false; 
     if(!newVal) this->listenStop();
     return !newVal;
 }
@@ -141,7 +146,7 @@ bool SenvilleAURADisp::hasUpdate() {
 char *SenvilleAURADisp::toBuff(char *buf) {
     int pos = 0;
     sprintf(buf,"{"STAT_DISPRAW":0x");
-    for(uint8_t ptr = 0; ptr < DISPLAY_BYTE_SIZE; ptr++) {
+    for(uint8_t ptr = 0; ptr < DISP_LEDS; ptr++) {
         APND_CHARBUFF(pos,buf,(displayBuff[ptr]<0x10?"0":""), "")
         APND_CHARBUFF(pos,buf,"%0X", displayBuff[ptr])
     }
