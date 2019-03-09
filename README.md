@@ -26,7 +26,7 @@ Specific to the Senville AURA brand of Heat Pump (this may also work for some Mr
 
 Trust me, with this class of heat pump, there is no serial link here.  I've searched deeply for it! (There is a programming header on the interior board but I just didn't want to go there.  Other than that connector, the only serial link is between the interior and the exterior boards .. something else I didn't want to disturb.)  To fully replace the display board with, for example, a NodeMcu demo board, you'd wire it as such :
 
-CN301 --> NodeMcu
+CN201 --> NodeMcu
 --------------------------
 *  GND  Black --> GND 
 *  5V   White --> 5V In
@@ -46,6 +46,10 @@ For configuring WiFI, create your own config.json file in your working project f
 Example: 
 
 {"name": "heatpump","wifi": {"ssid": "VeggiePlatter","password": "chicken"},"mqtt": {"host": "192.168.1.199","port": 1883,"auth": false},"ota": {"enabled": true},"device_id": "heatpump"}
+
+Sending an instruction to turn on heatpump, set temp, and put in heat mode with auto fan from MQTT :
+
+...: mosquitto_pub -h localhost -t homie/heatpump/hvac/control/set -m "{IsOn:1, Mode:3, FanSpeed:0, SetTemp:22}"
 
 ## Upcoming
 
