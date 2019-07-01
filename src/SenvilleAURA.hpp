@@ -27,6 +27,11 @@
     |        | Bit separator then data bit
     |
     | Two synch preamble pulses
+ 
+ Some sample commands in JSON syntax using fromJsonBuff() :
+ 
+ Turn AC on and set temp :  {Instr:1, IsOn:1, Mode:0, FanSpeed:0, SetTemp:24}
+ 
  */
 
 #define MESSAGE_SAMPLES 2

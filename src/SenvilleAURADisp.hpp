@@ -25,10 +25,10 @@
  * ------------------
  * Normal mode :  Displays the Set Temperature
  *
- * Diagnostic mode : Send Option::Led three times then send Option::Direct three times.
- *   From there, send Option::Led to step forward in displaying parameters below
- *   (Option::Direct to step in reverse).  This mode is exited by non-activity timout
- *   period of a few seconds.
+ * Diagnostic mode : Send Option::Led three times {Instr:2, Opt:8} then send Option::Direct
+ *   {Instr:2, Opt:1} three times. From there, send Option::Led to step forward in displaying
+ *   parameters below (Option::Direct to step in reverse).  This mode is exited by non-activity
+ *   timout period of a few seconds.
  *
  * Parameters :
  * -- Meaning of values below : (specialized semi-hex display scheme that 'cheats' three characters for neg & 100's)
