@@ -22,7 +22,7 @@ SenvilleAURADisp *disp;
 uint8_t byteMsgBuf[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
 volatile char *controlBuff;
 volatile char *displayBuff;
-unsigned long lastUpdate = 0;
+unsigned long lastUpdate;
 volatile uint8_t updateFlags = UpdateProperty::None;
 
 typedef enum PropertyE {
@@ -58,6 +58,12 @@ void loopHandler() {
   bool change = false;
   uint8_t *mem = NULL;
 
+  if(lastUpdate == 0) {
+    ESP.wdtDisable(); // now must be fed every 6 seconds, first loop can take time to connect etc.
+  } else {
+    ESP.wdtFeed();
+  }
+  
   // Check display hardware
   if(disp->hasUpdate()) {
 #ifdef DEBUG
@@ -135,7 +141,9 @@ bool propertyHandler(Property prop, const HomieRange& range, const String& value
   return true;
 }
 
-void setup() {    
+void setup() {   
+  ESP.wdtEnable( 30 * 1000 ); // Allow software watchdog
+  lastUpdate = 0;
   controlBuff = (char *)malloc(sizeof(char) * maxBuffLen);
   displayBuff = (char *)malloc(sizeof(char) * maxBuffLen);
   
