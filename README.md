@@ -34,7 +34,7 @@ CN201 --> NodeMcu
 *  DATA Orange - DATA for LEDs  --> D7 (DATA_MOSI)
 *  LED1 Green - LED1 select w. 12 ms waveform --> Not connected
 *  LED2 Dk Blue - LED2 select w. 12 ms waveform --> Not connected
-*  LED  Purple - LED select w. 12 ms waveform -- > D1
+*  LED  Purple - LED select w. 12 ms waveform -- > D2
 *  CLK  Grey - CLK w. 8-bit bursts of 10 us tick each 4 ms --> D5 (CLK_HSPI)
 
 NOTE and NB! :  ESP8266 is said to be 5V tolerant on sensing and will only drive pins to 3.3V but you may want to use some level converting circuitry here, just in case.  I tested without level conversion but intend to use level conversion in the final project.  The signals are all 'input' really.  The IR signal is normally high and pulled low by the ESP8266.  I'm merely adding for sake of possible surges or power on/off spikes.
