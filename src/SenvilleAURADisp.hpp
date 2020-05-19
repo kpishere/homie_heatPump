@@ -15,7 +15,7 @@
  *  LED  Purple - LED select w. 12 ms waveform
  *  CLK  Grey - CLK w. 8-bit bursts of 10 us tick each 4 ms
  *
- *  - IR needs interrupt handler on UP/DN transistions (see IRHVACLink.hpp)
+ *  - IR needs interrupt handler on UP/DN transistions (see IRLink.hpp)
  *  - CLK needs interrupt handler on UP transition, then read state of DATA
  *  - LED, LED1, LED2 need interrupt on DN transition to know whom next data byte is for
  *    only one is used for 'byte alignment' as they fire in repeating order

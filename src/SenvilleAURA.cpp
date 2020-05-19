@@ -46,15 +46,12 @@ uint8_t calcChecksum(const uint8_t state[],
     }
     return checksum - 0x01;
 }
-////////
-//
-IRHVACConfig config;
-//
-////////
 
 ////////
 //
 ////////
+IRConfig SenvilleAURA::config;
+
 uint8_t SenvilleAURA::calcCRC(short _sample) {
     return reverse(~(calcChecksum(&message[MSG_CONST_STATE(_sample)], MSG_CONST_STATE(1)-1)));
 }
@@ -76,8 +73,8 @@ SenvilleAURA::SenvilleAURA() {
     this->setTempDegC = 0;
     this->validSamplePtr = 0;
 };
-const IRHVACConfig *SenvilleAURA::getIRHVACConfig() {
-    return (const IRHVACConfig *)&config;
+const IRConfig *SenvilleAURA::getIRConfig() {
+    return (const IRConfig *)&config;
 }
 bool SenvilleAURA::isValid(uint8_t *msg, bool setCRC) {
     this->validSamplePtr = 0;

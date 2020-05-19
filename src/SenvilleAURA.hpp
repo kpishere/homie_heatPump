@@ -8,7 +8,7 @@
 
 #include <stdio.h>
 #include "Arduino.h"
-#include "IRHVACConfig.hpp"
+#include "IRLink.hpp"
 
 /* Notes on waveform configured below :
  *  - There is no significance to high or low values, it is all about pulse durations.
@@ -37,13 +37,10 @@
 #define MESSAGE_SAMPLES 2
 #define MESSAGE_BITS 48 // Message is ten nibbles, fits into 5 bytes, plus CRC
 #define MESSAGE_SYNC_BITS 2
-
-#define SYNC_PREAMBLE 2
 #define SYNC_PREAMBLE_0  4100.0
 #define SYNC_PREAMBLE_1  4320.0
 
 #define TOLERANCE_PERCENT 0.21f
-#define SYNC_LENGTH 5120.0
 #define SEP_LENGTH0  500.0
 #define BIT0_LENGTH  500.0
 #define BIT1_LENGTH 1560.0
@@ -84,6 +81,7 @@ class SenvilleAURA {
      *  [5] > ******** CRC
      */
 private:
+    static IRConfig config;
     unsigned long sampleId;
     unsigned long lastSampleMs;
     unsigned short setTempDegC;
@@ -97,7 +95,7 @@ private:
 public:
     SenvilleAURA();
     
-    const IRHVACConfig *getIRHVACConfig();
+    const IRConfig *getIRConfig();
 
     // If msg is valid, it is copied locally into the class
     bool isValid(uint8_t *msg, bool setCRC = false);

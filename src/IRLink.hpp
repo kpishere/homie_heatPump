@@ -1,13 +1,12 @@
 //
-//  IRHVACLink.hpp
+//  IRLink.hpp
 //  
 
-#ifndef IRHVACLink_hpp
-#define IRHVACLink_hpp
+#ifndef IRLink_hpp
+#define IRLink_hpp
 
 #include <stdio.h>
 #include "Arduino.h"
-#include "IRHVACConfig.hpp"
 
 // ring buffer size has to be large enough to fit
 // data between two successive sync signals
@@ -21,15 +20,50 @@
 #define IR_PIN D1
 #endif
 
+#define TOLERANCE_PERCENT 0.21f
+
+// Memory allocation function for containing message sent/received
+// Note: remainder test is for non-8-bit multiple message sizes
+#define MSGSIZE_BYTES(samp,msgbits) ((samp) * ((msgbits) % BITS_IN_BYTE > 0 ? 1 : 0) + (samp) * (msgbits) / BITS_IN_BYTE )
+
+#define CALC_LO(v) (unsigned long)(v * (1.0 - TOLERANCE_PERCENT ) )
+#define CALC_HI(v) (unsigned long)(v * (1.0 + TOLERANCE_PERCENT ) )
+#define diffRollSafeUnsignedLong(t1,t2) (t2>t1? t2-t1 : t2+4294967295-t1 )
+#define BITS_IN_BYTE 8
+
+// Hi/lo tolerance is used for pulse duration timing
+typedef struct IRPulseLengthUsS {
+    unsigned short lo;
+    unsigned short val;
+    unsigned short hi;
+    IRPulseLengthUsS(unsigned short _val = 0.0) {
+        lo = CALC_LO(_val);
+        hi = CALC_HI(_val);
+        val = _val;
+    }
+} IRPulseLengthUs;
+
+// Message definition
+typedef struct IRConfigS {
+    uint8_t msgSamplesCnt;
+    uint8_t msgBitsCnt;
+    uint8_t msgSyncCnt;
+    IRPulseLengthUs *syncLengths;
+    IRPulseLengthUs bitSeparatorLength;
+    IRPulseLengthUs bitZeroLength;
+    IRPulseLengthUs bitOneLength;
+    IRPulseLengthUs msgBreakLength;
+} IRConfig;
+
 typedef enum IRMsgStateE {Preamble, Message} IRMsgState;
 
-class IRHVACLink {
+class IRLink {
 public:
-    IRHVACLink(const IRHVACConfig *_config);
-    ~IRHVACLink();
+    IRLink(const IRConfig *_config);
+    ~IRLink();
     
     // NOTE: caller owns memory pointed to and it is presumed to have enough
-    // valid data to satisfy the IRHVACConfig defintion of the message
+    // valid data to satisfy the IRConfig defintion of the message
     // Wait is for message to be sent.  Otherwise, if you call listen() right away, you'll get a
     // feedback loop (good for memory leak testing!)
     void send(uint8_t *msg, bool noWait = false);
@@ -43,7 +77,7 @@ public:
     uint8_t *loop_chkMsgReceived();
     void handler();
 
-    static const IRHVACConfig *config;
+    static const IRConfig *config;
 private:
     static volatile unsigned long timings[RING_BUFFER_SIZE];
     static volatile unsigned long lastTime;
@@ -58,4 +92,4 @@ private:
     bool isSync(unsigned int idx);
 };
 
-#endif /* IRHVACLink_hpp */
+#endif /* IRLink_hpp */

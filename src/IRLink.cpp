@@ -1,9 +1,9 @@
 //
-//  IRHVACLink.cpp
+//  IRLink.cpp
 //  
 //  Hardware layer implementation of IR pulse signaling
 //
-#include "IRHVACLink.hpp"
+#include "IRLink.hpp"
 //#define DEBUG
 //#define DEBUG_BITS
 
@@ -16,15 +16,15 @@
 #endif
 
 // Receive values of pointers and state variables
-const IRHVACConfig *IRHVACLink::config;
-volatile unsigned long IRHVACLink::lastTime = micros();
-volatile unsigned int IRHVACLink::ringIndex = 0;
-volatile unsigned int IRHVACLink::syncIndex1 = 0;
-volatile unsigned int IRHVACLink::edgeCount1 = 0;
-volatile unsigned int IRHVACLink::edgeCount = 0;
-volatile bool IRHVACLink::received = false;
-volatile IRMsgState IRHVACLink::state = Preamble;
-volatile unsigned long IRHVACLink::timings[RING_BUFFER_SIZE];
+const IRConfig *IRLink::config;
+volatile unsigned long IRLink::lastTime = micros();
+volatile unsigned int IRLink::ringIndex = 0;
+volatile unsigned int IRLink::syncIndex1 = 0;
+volatile unsigned int IRLink::edgeCount1 = 0;
+volatile unsigned int IRLink::edgeCount = 0;
+volatile bool IRLink::received = false;
+volatile IRMsgState IRLink::state = Preamble;
+volatile unsigned long IRLink::timings[RING_BUFFER_SIZE];
 uint8_t *msgReceivedPtr;
 const unsigned char byteMask[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 
@@ -41,7 +41,7 @@ int volatile tc1_ptr;
 
 // Only one instance of this class is supported, the last
 // class to invoke listen() wins.  First class to exit disables interrupt.
-IRHVACLink *lastInstance;
+IRLink *lastInstance;
 void ISRHandler() {
     if(lastInstance) lastInstance->handler();
 }
@@ -57,9 +57,9 @@ ISR(TIMER1_COMPA_vect){
     // Increment pointer in array
     tc1_ptr++;
     // If at end, stop
-    if ( tc1_ptr >= MSGSIZE(IRHVACLink::config->msgSamplesCnt,IRHVACLink::config->msgBitsCnt
-                            ,IRHVACLink::config->msgSyncCnt
-                            ,IRHVACLink::config->msgBreakLength.val)) {
+    if ( tc1_ptr >= MSGSIZE(IRLink::config->msgSamplesCnt,IRLink::config->msgBitsCnt
+                            ,IRLink::config->msgSyncCnt
+                            ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
         TIMSK1 &= ~(1 << OCIE1A);
     }
@@ -75,9 +75,9 @@ void ICACHE_RAM_ATTR onTimer1ISR(){
     // Increment pointer in array
     tc1_ptr++;
     // If at end, stop
-    if ( tc1_ptr >= MSGSIZE(IRHVACLink::config->msgSamplesCnt,IRHVACLink::config->msgBitsCnt
-                            ,IRHVACLink::config->msgSyncCnt
-                            ,IRHVACLink::config->msgBreakLength.val)) {
+    if ( tc1_ptr >= MSGSIZE(IRLink::config->msgSamplesCnt,IRLink::config->msgBitsCnt
+                            ,IRLink::config->msgSyncCnt
+                            ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
         timer1_disable();
         pinMode(IR_PIN,INPUT);
@@ -117,7 +117,7 @@ void configSend() {
 //////////
 // Class methods
 //////////
-IRHVACLink::IRHVACLink(const IRHVACConfig *_config) {
+IRLink::IRLink(const IRConfig *_config) {
     config = _config;
 #if defined(__AVR__)
     pulsesToSend = (unsigned short *)malloc(sizeof(unsigned short)*MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
@@ -128,12 +128,12 @@ IRHVACLink::IRHVACLink(const IRHVACConfig *_config) {
     msgReceivedPtr = (uint8_t *)malloc(sizeof(uint8_t) * MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt));
     pinMode(IR_PIN, INPUT);
 }
-IRHVACLink::~IRHVACLink() {
+IRLink::~IRLink() {
     if(pulsesToSend) free((void *)pulsesToSend);
     if(msgReceivedPtr) free((void *)msgReceivedPtr);
     lastInstance = 0;
 }
-void IRHVACLink::listen() {
+void IRLink::listen() {
     lastInstance = this;
     // clear buffer
     for(unsigned int i = 0; i<RING_BUFFER_SIZE; i++) timings[i] = 0;
@@ -141,10 +141,10 @@ void IRHVACLink::listen() {
     if(msgReceivedPtr != NULL) for(int i=0; i<MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt); i++) msgReceivedPtr[i] = 0;
     attachInterrupt(digitalPinToInterrupt(IR_PIN), ISRHandler, CHANGE);
 }
-void IRHVACLink::listenStop() {
+void IRLink::listenStop() {
     detachInterrupt(digitalPinToInterrupt(IR_PIN));
 }
-void IRHVACLink::send(uint8_t *msg, bool noWait) {
+void IRLink::send(uint8_t *msg, bool noWait) {
     short ptr, slptr;
     unsigned int duration = 0;
                                 
@@ -236,7 +236,7 @@ void IRHVACLink::send(uint8_t *msg, bool noWait) {
 }
 
 // detect if a sync signal is present
-bool IRHVACLink::isSync(unsigned int idx) {
+bool IRLink::isSync(unsigned int idx) {
     // Test for each expected preamble value
     for(unsigned int i= 0; i < this->config->msgSyncCnt; i++) {
         unsigned long v =  timings[(idx+RING_BUFFER_SIZE-this->config->msgSyncCnt+i+1) % RING_BUFFER_SIZE];
@@ -248,7 +248,7 @@ bool IRHVACLink::isSync(unsigned int idx) {
 };
 
 /* Interrupt handler */
-void IRHVACLink::handler() {
+void IRLink::handler() {
     unsigned long duration = 0;
 
     // ignore if we haven't processed the previous received signal
@@ -290,7 +290,7 @@ void IRHVACLink::handler() {
     }
 };
 
-uint8_t *IRHVACLink::loop_chkMsgReceived() {
+uint8_t *IRLink::loop_chkMsgReceived() {
     byte *result = NULL;
     unsigned int bitInMsg = 0;
     

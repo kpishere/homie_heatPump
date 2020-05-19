@@ -1,7 +1,8 @@
-#include "src/IRHVACLink.hpp"
+
+#include "src/IRLink.hpp"
 #include "src/SenvilleAURA.hpp"
 
-IRHVACLink *irReceiver;
+IRLink *irReceiver;
 SenvilleAURA *senville;
 char outputBuff[100];
 
@@ -9,7 +10,7 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Started.");
   senville = new SenvilleAURA();
-  irReceiver = new IRHVACLink(senville->getIRHVACConfig());
+  irReceiver = new IRLink(senville->getIRConfig());
   irReceiver->listen();
 }
 
@@ -18,7 +19,7 @@ void loop() {
   if(mem != NULL) {
     Serial.print("Received message : 0x");
     for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
-      Serial.printf("%0X ",mem[i]);
+      Serial.print(mem[i]);
     Serial.println();
  
     if(senville->isValid(mem)) {
