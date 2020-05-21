@@ -15,9 +15,11 @@
 #if defined(__AVR__)
 #define IR_DDRPRT DDRA
 #define IR_SENDPORT PORTA
-#define IR_PIN PA3
+#define IR_PINR PA3
+#define IR_PINX PA3
 #elif defined(ESP8266)
-#define IR_PIN D1
+#define IR_PINR D1
+#define IR_PINX D1
 #endif
 
 #define TOLERANCE_PERCENT 0.21f

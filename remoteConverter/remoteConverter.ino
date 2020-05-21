@@ -1,6 +1,16 @@
 #include "src/IRLink.hpp"
 #include "src/IRNECRemote.hpp"
 
+// Extended hardware control to use a pin to control connection of
+// the IR sensor from direct connection to indirect through this device.
+// Physical components on-hand include a level shifter from 3-5V and
+// an optio-isolator (Tri-state non-inverting buffer would be ideal but this is what I had)
+//
+#if defined(__AVR__)
+#elif defined(ESP8266)
+#define IR_TRISTATE D2
+#endif
+
 typedef struct necIrCmdMapS {
     unsigned char a;
     unsigned char b;
@@ -48,6 +58,11 @@ irMsg translateB2A(unsigned char in_b0, irMsg in,
 void setup() {
   Serial.begin(115200);
   Serial.println("Started.");
+
+  // This is expected to be active low to enable connection of a tri-state buffer equivilant circuit
+  digitalWrite(IR_TRISTATE, HIGH);
+  pinMode(IR_TRISTATE, OUTPUT);
+  
   rmt = new IRNECRemote();
   irReceiver = new IRLink(rmt->getIRConfig());
   irReceiver->listen();  
@@ -69,9 +84,12 @@ void loop() {
       rmt->setMessage( translateB2A(otherAddr, rmt->getMessage(), LMViewAddr) );
 
       // Test sending value
-      delay(5000);
       Serial.println("Check sent message on scope etc.");
-      irReceiver->send(rmt->rawMessage());      
+ 
+      digitalWrite(IR_TRISTATE, LOW); // Disable other IR sensor
+      irReceiver->send(rmt->rawMessage());   
+      digitalWrite(IR_TRISTATE, HIGH); // Enable pass-thru of other IR sensor
+   
       Serial.println("listening...");
     }
     irReceiver->listen();

@@ -51,7 +51,7 @@ void ISRHandler() {
 ISR(TIMER1_COMPA_vect){
     cli();
     // Toggle output value
-    IR_SENDPORT ^= _BV(IR_PIN);
+    IR_SENDPORT ^= _BV(IR_PINX);
     // Set next timer value
     OCR1A = pulsesToSend[tc1_ptr];
     // Increment pointer in array
@@ -69,7 +69,7 @@ ISR(TIMER1_COMPA_vect){
 void ICACHE_RAM_ATTR onTimer1ISR(){
     cli();
     // Toggle output value
-    digitalWrite(IR_PIN,!(digitalRead(IR_PIN)));  //Toggle LED Pin
+    digitalWrite(IR_PINX,!(digitalRead(IR_PINX)));  //Toggle LED Pin
     // Set next timer value
     timer1_write(pulsesToSend[tc1_ptr]);
     // Increment pointer in array
@@ -80,7 +80,7 @@ void ICACHE_RAM_ATTR onTimer1ISR(){
                             ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
         timer1_disable();
-        pinMode(IR_PIN,INPUT);
+        pinMode(IR_PINX,INPUT);
     }
     sei();
 }
@@ -91,9 +91,9 @@ void configSend() {
 #if defined(__AVR__)
     // Setup X-mit pin
     // Set up pin for output
-    IR_DDRPRT  |= _BV(IR_PIN);
+    IR_DDRPRT  |= _BV(IR_PINX);
     // Set value high
-    IR_SENDPORT |= _BV(IR_PIN);
+    IR_SENDPORT |= _BV(IR_PINX);
     
     // Set up timer counter
     TCCR1A = 0;// set entire TCCR1A register to 0
@@ -108,8 +108,8 @@ void configSend() {
     
 #elif defined(ESP8266)
     timer1_isr_init();
-    pinMode(IR_PIN,OUTPUT);
-    digitalWrite(IR_PIN,HIGH);
+    pinMode(IR_PINX,OUTPUT);
+    digitalWrite(IR_PINX,HIGH);
 #endif
     sei();//allow interrupts
 }
@@ -126,7 +126,7 @@ IRLink::IRLink(const IRConfig *_config) {
 #endif
 
     msgReceivedPtr = (uint8_t *)malloc(sizeof(uint8_t) * MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt));
-    pinMode(IR_PIN, INPUT);
+    pinMode(IR_PINR, INPUT);
 }
 IRLink::~IRLink() {
     if(pulsesToSend) free((void *)pulsesToSend);
@@ -139,10 +139,10 @@ void IRLink::listen() {
     for(unsigned int i = 0; i<RING_BUFFER_SIZE; i++) timings[i] = 0;
     // Clear msgReceivedPtr
     if(msgReceivedPtr != NULL) for(int i=0; i<MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt); i++) msgReceivedPtr[i] = 0;
-    attachInterrupt(digitalPinToInterrupt(IR_PIN), ISRHandler, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(IR_PINR), ISRHandler, CHANGE);
 }
 void IRLink::listenStop() {
-    detachInterrupt(digitalPinToInterrupt(IR_PIN));
+    detachInterrupt(digitalPinToInterrupt(IR_PINR));
 }
 void IRLink::send(uint8_t *msg, bool noWait) {
     short ptr, slptr;
