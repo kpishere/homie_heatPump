@@ -10,7 +10,6 @@
 
 // ring buffer size has to be large enough to fit
 // data between two successive sync signals
-// TODO : make this config parameter
 #define RING_BUFFER_SIZE  550
 
 #if defined(__AVR__)
@@ -23,7 +22,6 @@
 #define IR_PINX D1
 #endif
 
-// TODO : make this config parameter
 #define TOLERANCE_PERCENT 0.12f
 
 // Memory allocation function for containing message sent/received

@@ -1,5 +1,6 @@
 #include "src/IRLink.hpp"
 #include "src/IRNECRemote.hpp"
+//#define DEBUG
 
 typedef struct necIrCmdMapS {
     unsigned char a;
@@ -48,34 +49,38 @@ irMsg translateB2A(uint16_t in_b0, irMsg in,
 void setup() {
   char buff[800];
   IRConfig *cnf;
-  
+#ifdef DEBUG
   Serial.begin(115200);
   Serial.println("\nStarted.");
-    
+#endif
   rmt = new IRNECRemote();
   cnf = rmt->getIRConfig();
+#ifdef DEBUG
   Serial.println("Signal configuration:");
   Serial.println(cnf->display(buff));
+#endif
   irReceiver = new IRLink(cnf, D2, D1);
   irReceiver->listen();  
 }
 void loop() {
   uint8_t *mem = irReceiver->loop_chkMsgReceived();
   if(mem != NULL) {
+#ifdef DEBUG   
     Serial.print("Received message : 0x");
     for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++) {
       Serial.print(mem[i], HEX); Serial.print(" "); 
     }
     Serial.println();
- 
+ #endif
     if(rmt->isValid(mem)) {
+#ifdef DEBUG
       Serial.print("Validated message : ");
       rmt->toBuff(outputBuff);
       Serial.println(outputBuff);
-
+#endif
       // Translate
       rmt->setMessage( translateB2A(otherAddr, rmt->getMessage(), LMViewAddr) );
-
+#ifdef DEBUG
       // Test sending value
       Serial.println("Check sent message on scope etc.");
 
@@ -85,10 +90,12 @@ void loop() {
         Serial.print(mem[i], HEX); Serial.print(" "); 
       }
       Serial.println();
- 
+#endif 
       irReceiver->send(rmt->rawMessage());   
    
+#ifdef DEBUG
       Serial.println("listening...");
+#endif
     }
     irReceiver->listen();
   }  
