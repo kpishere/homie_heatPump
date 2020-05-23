@@ -27,8 +27,8 @@ bool IRNECRemote::isValid(uint8_t *msg, bool setCRC) {
     // Test that each pair of bytes is inverse of the next
     if( (msg[2] & 0xFF) == (~msg[3] & 0xff)) {
         memmove(message, msg, MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
-        message[0] = reverse(message[0]);
-        message[1] = reverse(message[1]);
+        message[0] = IRLink::reverse(message[0]);
+        message[1] = IRLink::reverse(message[1]);
         return true;
     }
     return false;
@@ -41,8 +41,8 @@ irMsg IRNECRemote::getMessage() {
     return v;
 }
 void IRNECRemote::setMessage(irMsg m) {
-    message[0] = reverse(m.addr & 0xff);
-    message[1] = reverse((m.addr >> 8) & 0xff);
+    message[0] = IRLink::reverse(m.addr & 0xff);
+    message[1] = IRLink::reverse((m.addr >> 8) & 0xff);
     message[2] = m.cmd;
     message[3] = ~m.cmd;
 }
@@ -58,11 +58,4 @@ char *IRNECRemote::toBuff(char *buf) {
     APND_CHARBUFF(pos,buf,"%02hX ", m.cmd)
     pos = strlen(buf);
     return buf;
-}
-
-uint8_t IRNECRemote::reverse(uint8_t b) {
-   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-   return b;
 }

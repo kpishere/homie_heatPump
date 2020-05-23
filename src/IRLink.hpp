@@ -104,6 +104,9 @@ public:
 
     static IRConfig *config;
     static uint8_t pinX, pinR; // Assignable send/receive pins
+    
+    // Utillity methods
+    static uint8_t reverse(uint8_t b);
 private:
     static volatile unsigned long timings[RING_BUFFER_SIZE];
     static volatile unsigned long lastTime;

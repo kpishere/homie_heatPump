@@ -78,7 +78,6 @@ public:
     uint8_t *rawMessage();
 
     char *toBuff(char *buf);
-    static uint8_t reverse(uint8_t b);
 };
 
 #endif IRNECRemote_hpp

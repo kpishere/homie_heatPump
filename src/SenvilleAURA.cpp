@@ -25,12 +25,6 @@
 #define CMD_OPT     "Opt"
 #define STAT_RAW    "Unknown"
 
-unsigned char reverse(unsigned char b) {
-    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-    return b;
-}
 uint8_t calcChecksum(const uint8_t state[],
                                   const uint16_t length) {
     uint8_t checksum = 0;
@@ -39,7 +33,7 @@ uint8_t calcChecksum(const uint8_t state[],
     Serial.println(length);
 #endif
     for (uint8_t i = 0; i < length; i++) {
-            checksum += reverse(state[i]);
+            checksum += IRLink::reverse(state[i]);
 #ifdef DEBUG
         Serial.printf("crc val %0X\n",state[i]);
 #endif
@@ -53,7 +47,7 @@ uint8_t calcChecksum(const uint8_t state[],
 IRConfig SenvilleAURA::config;
 
 uint8_t SenvilleAURA::calcCRC(short _sample) {
-    return reverse(~(calcChecksum(&message[MSG_CONST_STATE(_sample)], MSG_CONST_STATE(1)-1)));
+    return IRLink::reverse(~(calcChecksum(&message[MSG_CONST_STATE(_sample)], MSG_CONST_STATE(1)-1)));
 }
 SenvilleAURA::SenvilleAURA() {
     config.msgSamplesCnt = MESSAGE_SAMPLES;
