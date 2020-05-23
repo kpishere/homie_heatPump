@@ -18,7 +18,11 @@ This library sports fully independent classes for physical layer communication a
 
 ## Features
 
-This library is independent of Homie, the example merely uses it and you'll have to check out the Homie project if you'd like to set up your development environment to use that too.  This library is written for and tested on ESP8266 and Atmel Mega 2650 (and likely works for other Atmel chips .. haven't tested and you're welcome to test/patch etc.)  It is written using interrupt driven events for reading data and an interrupt timer for sending data and thus is written to play nice with ESP8266 WiFi interrupt responsiveness demands.
+This library is independent of Homie, the example merely uses it and you'll have to check out the Homie project if you'd like to set up your development environment to use that too.  This library is written for and tested on ESP8266 and Atmel Mega 2650 (and likely works for other Atmel chips .. haven't tested and you're welcome to test/patch etc.)  It is written using interrupt driven events for reading data and an interrupt timer for sending data and thus is written to play nice with ESP8266 WiFi interrupt responsiveness demands.  
+
+*New*
+
+A configuration for a generic NEC remote control has been added -- for something completely different from HVAC.  With that, the send/receive pins can be split and are parameterized. 
 
 ## Wiring Suggestions
 
