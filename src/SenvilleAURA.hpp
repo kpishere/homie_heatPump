@@ -95,7 +95,7 @@ private:
 public:
     SenvilleAURA();
     
-    const IRConfig *getIRConfig();
+    IRConfig *getIRConfig();
 
     // If msg is valid, it is copied locally into the class
     bool isValid(uint8_t *msg, bool setCRC = false);

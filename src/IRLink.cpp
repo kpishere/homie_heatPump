@@ -4,7 +4,7 @@
 //  Hardware layer implementation of IR pulse signaling
 //
 #include "IRLink.hpp"
-//#define DEBUG
+#define DEBUG
 //#define DEBUG_BITS
 
 #if defined(__AVR__)
@@ -16,7 +16,7 @@
 #endif
 
 // Receive values of pointers and state variables
-const IRConfig *IRLink::config;
+IRConfig *IRLink::config;
 volatile unsigned long IRLink::lastTime = micros();
 volatile unsigned int IRLink::ringIndex = 0;
 volatile unsigned int IRLink::syncIndex1 = 0;
@@ -25,6 +25,8 @@ volatile unsigned int IRLink::edgeCount = 0;
 volatile bool IRLink::received = false;
 volatile IRMsgState IRLink::state = Preamble;
 volatile unsigned long IRLink::timings[RING_BUFFER_SIZE];
+uint8_t IRLink::pinX, IRLink::pinR; // Assignable send/receive pins
+
 uint8_t *msgReceivedPtr;
 const unsigned char byteMask[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 
@@ -51,7 +53,7 @@ void ISRHandler() {
 ISR(TIMER1_COMPA_vect){
     cli();
     // Toggle output value
-    IR_SENDPORT ^= _BV(IR_PINX);
+    IR_SENDPORT ^= _BV(IRLink::pinX);
     // Set next timer value
     OCR1A = pulsesToSend[tc1_ptr];
     // Increment pointer in array
@@ -69,7 +71,7 @@ ISR(TIMER1_COMPA_vect){
 void ICACHE_RAM_ATTR onTimer1ISR(){
     cli();
     // Toggle output value
-    digitalWrite(IR_PINX,!(digitalRead(IR_PINX)));  //Toggle LED Pin
+    digitalWrite(IRLink::pinX,!(digitalRead(IRLink::pinX)));  //Toggle LED Pin
     // Set next timer value
     timer1_write(pulsesToSend[tc1_ptr]);
     // Increment pointer in array
@@ -80,7 +82,7 @@ void ICACHE_RAM_ATTR onTimer1ISR(){
                             ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
         timer1_disable();
-        pinMode(IR_PINX,INPUT);
+        pinMode(IRLink::pinX,INPUT);
     }
     sei();
 }
@@ -91,9 +93,9 @@ void configSend() {
 #if defined(__AVR__)
     // Setup X-mit pin
     // Set up pin for output
-    IR_DDRPRT  |= _BV(IR_PINX);
+    IR_DDRPRT  |= _BV(IRLink::pinX);
     // Set value high
-    IR_SENDPORT |= _BV(IR_PINX);
+    IR_SENDPORT |= _BV(IRLink::pinX);
     
     // Set up timer counter
     TCCR1A = 0;// set entire TCCR1A register to 0
@@ -108,17 +110,20 @@ void configSend() {
     
 #elif defined(ESP8266)
     timer1_isr_init();
-    pinMode(IR_PINX,OUTPUT);
-    digitalWrite(IR_PINX,HIGH);
+    pinMode(IRLink::pinX,OUTPUT);
+    digitalWrite(IRLink::pinX,HIGH);
 #endif
     sei();//allow interrupts
 }
 
+
 //////////
 // Class methods
 //////////
-IRLink::IRLink(const IRConfig *_config) {
+IRLink::IRLink(IRConfig *_config, uint8_t ppinX, uint8_t ppinR) {
     config = _config;
+    pinX = ppinX;
+    pinR = ppinR;
 #if defined(__AVR__)
     pulsesToSend = (unsigned short *)malloc(sizeof(unsigned short)*MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
 #elif defined(ESP8266)
@@ -126,7 +131,7 @@ IRLink::IRLink(const IRConfig *_config) {
 #endif
 
     msgReceivedPtr = (uint8_t *)malloc(sizeof(uint8_t) * MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt));
-    pinMode(IR_PINR, INPUT);
+    pinMode(pinR, INPUT);
 }
 IRLink::~IRLink() {
     if(pulsesToSend) free((void *)pulsesToSend);
@@ -139,10 +144,10 @@ void IRLink::listen() {
     for(unsigned int i = 0; i<RING_BUFFER_SIZE; i++) timings[i] = 0;
     // Clear msgReceivedPtr
     if(msgReceivedPtr != NULL) for(int i=0; i<MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt); i++) msgReceivedPtr[i] = 0;
-    attachInterrupt(digitalPinToInterrupt(IR_PINR), ISRHandler, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinR), ISRHandler, CHANGE);
 }
 void IRLink::listenStop() {
-    detachInterrupt(digitalPinToInterrupt(IR_PINR));
+    detachInterrupt(digitalPinToInterrupt(pinR));
 }
 void IRLink::send(uint8_t *msg, bool noWait) {
     short ptr, slptr;
@@ -276,10 +281,10 @@ void IRLink::handler() {
         case Message:
             edgeCount++;
             // A sync in message state is a second re-transmession of message
-            if (edgeCount1 || isSync(ringIndex)) {
+            if (edgeCount1 || isSync((ringIndex - 1) % RING_BUFFER_SIZE)) {
                 edgeCount1++;
-                if (edgeCount >= (this->config->msgBitsCnt + this->config->msgSyncCnt) * 2 * config->msgSamplesCnt - 1
-                    ) {
+                if (edgeCount > (this->config->msgBitsCnt * 2 * config->msgSamplesCnt + this->config->msgSyncCnt) )
+                {
                     // and wait for msg to be picked up
                     this->listenStop();
                     received = true;
@@ -296,7 +301,7 @@ uint8_t *IRLink::loop_chkMsgReceived() {
     
     if (received == true) {
 #ifdef DEBUG
-        // Print preamble
+         Serial.print("preamble: ");
          for(unsigned int i= 0; i < config->msgSyncCnt; i++) {
              unsigned long v =  timings[(syncIndex1+RING_BUFFER_SIZE-config->msgSyncCnt+i+1) % RING_BUFFER_SIZE];
              Serial.print(v); Serial.print(" ");
@@ -309,8 +314,17 @@ uint8_t *IRLink::loop_chkMsgReceived() {
         // Value output
         for(unsigned int i=config->msgSyncCnt; i<(edgeCount-config->msgSyncCnt); i+=2) {
             unsigned long t0 = timings[(syncIndex1+RING_BUFFER_SIZE-config->msgSyncCnt+i+1) % RING_BUFFER_SIZE]
-                , t1 = timings[(syncIndex1+RING_BUFFER_SIZE-config->msgSyncCnt+i+1+1) % RING_BUFFER_SIZE];
+                ,         t1 = timings[(syncIndex1+RING_BUFFER_SIZE-config->msgSyncCnt+i+1+1) % RING_BUFFER_SIZE];
             
+#ifdef DEBUG
+            Serial.print(" ");
+            Serial.print(i);
+            Serial.print(" t0 ");
+            Serial.print(t0);
+            Serial.print(" t1 ");
+            Serial.print(t1);
+            Serial.println("");
+#endif
             if (t1>(this->config->bitZeroLength.lo) && t1<(this->config->msgBreakLength.hi)) { // Highest and lowest possible of all
                 if (t1>this->config->bitZeroLength.lo && t1<this->config->bitZeroLength.hi) {
                     // Do nothing as buffer is initialized to zero
@@ -322,7 +336,9 @@ uint8_t *IRLink::loop_chkMsgReceived() {
                     bitInMsg++;
                 }
                 // All sync durations are longer than
-                if (t1>this->config->msgBreakLength.lo && t1<this->config->msgBreakLength.hi) {
+                if ((t1>this->config->msgBreakLength.lo && t1<this->config->msgBreakLength.hi) /* At synch signal == eot*/
+                    || (i >= (edgeCount1 - 1)) /* at end of message length */
+                ) {
                     if( bitInMsg == this->config->msgBitsCnt) {
                         result = msgReceivedPtr; // Set the return pointer, we got something
                         // Advance to next valid space pulse
@@ -330,11 +346,6 @@ uint8_t *IRLink::loop_chkMsgReceived() {
                     }
                 }
             } else { // Non-compliant message, reset
-#ifdef DEBUG
-                Serial.print(" ");
-                Serial.print(i);
-                Serial.println(" BadMsg ");
-#endif
                 bitInMsg = 0;
                 result = NULL;
             }

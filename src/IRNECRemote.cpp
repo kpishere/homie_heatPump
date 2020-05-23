@@ -2,6 +2,7 @@
 #include "IRNECRemote.hpp"
 #include <ArduinoJson.h>
 
+
 IRConfig IRNECRemote::config;
 
 IRNECRemote::IRNECRemote() {
@@ -17,15 +18,17 @@ IRNECRemote::IRNECRemote() {
     config.bitOneLength = IRPulseLengthUsS(BIT1_LENGTH);
     config.msgBreakLength = IRPulseLengthUsS(EOT_LENGTH);
 };
-const IRConfig *IRNECRemote::getIRConfig() {
-    return (const IRConfig *)&config;
+IRConfig *IRNECRemote::getIRConfig() {
+    return (IRConfig *)&config;
 }
 
 // Check that buffer pointer has valid data and copy locally if so
 bool IRNECRemote::isValid(uint8_t *msg, bool setCRC) {
     // Test that each pair of bytes is inverse of the next
-    if(msg[0] == ~msg[1] || msg[2] == msg[3]) {
+    if( (msg[2] & 0xFF) == (~msg[3] & 0xff)) {
         memmove(message, msg, MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+        message[0] = reverse(message[0]);
+        message[1] = reverse(message[1]);
         return true;
     }
     return false;
@@ -33,13 +36,13 @@ bool IRNECRemote::isValid(uint8_t *msg, bool setCRC) {
 // Return message content
 irMsg IRNECRemote::getMessage() {
     irMsg v;
-    v.addr = message[0];
+    v.addr = (((uint16_t)message[1]) << 8) | message[0];
     v.cmd = message[2];
     return v;
 }
 void IRNECRemote::setMessage(irMsg m) {
-    message[0] = m.addr;
-    message[1] = ~m.addr;
+    message[0] = reverse(m.addr & 0xff);
+    message[1] = reverse((m.addr >> 8) & 0xff);
     message[2] = m.cmd;
     message[3] = ~m.cmd;
 }
@@ -47,12 +50,19 @@ uint8_t *IRNECRemote::rawMessage() {
     return message;
 }
 
-#define APND_CHARBUFF(pos,buf,arg0,arg1) (pos) = strlen(buf); sprintf(&(buf)[(pos)],arg0,arg1);
 char *IRNECRemote::toBuff(char *buf) {
+    irMsg m = this->getMessage();
     int pos = 0;
     sprintf(buf,"0x");
-    APND_CHARBUFF(pos,buf,"%0X ", message[0])
-    APND_CHARBUFF(pos,buf,"%0X ", message[2])
+    APND_CHARBUFF(pos,buf,"%04hX ", m.addr)
+    APND_CHARBUFF(pos,buf,"%02hX ", m.cmd)
     pos = strlen(buf);
     return buf;
+}
+
+uint8_t IRNECRemote::reverse(uint8_t b) {
+   b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+   b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+   b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+   return b;
 }

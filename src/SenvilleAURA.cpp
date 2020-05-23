@@ -73,8 +73,8 @@ SenvilleAURA::SenvilleAURA() {
     this->setTempDegC = 0;
     this->validSamplePtr = 0;
 };
-const IRConfig *SenvilleAURA::getIRConfig() {
-    return (const IRConfig *)&config;
+IRConfig *SenvilleAURA::getIRConfig() {
+    return (IRConfig *)&config;
 }
 bool SenvilleAURA::isValid(uint8_t *msg, bool setCRC) {
     this->validSamplePtr = 0;

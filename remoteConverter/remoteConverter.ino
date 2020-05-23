@@ -1,16 +1,6 @@
 #include "src/IRLink.hpp"
 #include "src/IRNECRemote.hpp"
 
-// Extended hardware control to use a pin to control connection of
-// the IR sensor from direct connection to indirect through this device.
-// Physical components on-hand include a level shifter from 3-5V and
-// an optio-isolator (Tri-state non-inverting buffer would be ideal but this is what I had)
-//
-#if defined(__AVR__)
-#elif defined(ESP8266)
-#define IR_TRISTATE D2
-#endif
-
 typedef struct necIrCmdMapS {
     unsigned char a;
     unsigned char b;
@@ -20,8 +10,8 @@ typedef struct necIrCmdMapS {
     }
 } necIrCmdMap;
 
-const unsigned char LMViewAddr = 0x00;
-const unsigned char otherAddr = 0x86;
+const uint16_t LMViewAddr = 0xFF00;
+const uint16_t otherAddr = 0x6B86;
 
 necIrCmdMap lmViewToAnon[] = {
     { 0x0C,0xF8}, { 0x0D,0xC0}, { 0x09,0x18}, { 0x05,0x58}, { 0x01,0xD8}, { 0x4F,0xDA}
@@ -38,8 +28,8 @@ IRLink *irReceiver;
 IRNECRemote *rmt;
 char outputBuff[100];
 
-irMsg translateB2A(unsigned char in_b0, irMsg in,
-    unsigned char out_b0) {
+irMsg translateB2A(uint16_t in_b0, irMsg in,
+    uint16_t out_b0) {
     irMsg out = in;
     int items = sizeof(lmViewToAnon) / sizeof(necIrCmdMap);
 
@@ -56,23 +46,26 @@ irMsg translateB2A(unsigned char in_b0, irMsg in,
 }
 
 void setup() {
-  Serial.begin(115200);
-  Serial.println("Started.");
-
-  // This is expected to be active low to enable connection of a tri-state buffer equivilant circuit
-  digitalWrite(IR_TRISTATE, HIGH);
-  pinMode(IR_TRISTATE, OUTPUT);
+  char buff[800];
+  IRConfig *cnf;
   
+  Serial.begin(115200);
+  Serial.println("\nStarted.");
+    
   rmt = new IRNECRemote();
-  irReceiver = new IRLink(rmt->getIRConfig());
+  cnf = rmt->getIRConfig();
+  Serial.println("Signal configuration:");
+  Serial.println(cnf->display(buff));
+  irReceiver = new IRLink(cnf, D2, D1);
   irReceiver->listen();  
 }
 void loop() {
   uint8_t *mem = irReceiver->loop_chkMsgReceived();
   if(mem != NULL) {
     Serial.print("Received message : 0x");
-    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
-      Serial.print(mem[i]);
+    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++) {
+      Serial.print(mem[i], HEX); Serial.print(" "); 
+    }
     Serial.println();
  
     if(rmt->isValid(mem)) {
@@ -85,10 +78,15 @@ void loop() {
 
       // Test sending value
       Serial.println("Check sent message on scope etc.");
+
+      Serial.print("Sending message : 0x");
+      mem = rmt->rawMessage();
+      for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++) {
+        Serial.print(mem[i], HEX); Serial.print(" "); 
+      }
+      Serial.println();
  
-      digitalWrite(IR_TRISTATE, LOW); // Disable other IR sensor
       irReceiver->send(rmt->rawMessage());   
-      digitalWrite(IR_TRISTATE, HIGH); // Enable pass-thru of other IR sensor
    
       Serial.println("listening...");
     }

@@ -10,6 +10,7 @@
 
 // ring buffer size has to be large enough to fit
 // data between two successive sync signals
+// TODO : make this config parameter
 #define RING_BUFFER_SIZE  550
 
 #if defined(__AVR__)
@@ -22,7 +23,8 @@
 #define IR_PINX D1
 #endif
 
-#define TOLERANCE_PERCENT 0.21f
+// TODO : make this config parameter
+#define TOLERANCE_PERCENT 0.12f
 
 // Memory allocation function for containing message sent/received
 // Note: remainder test is for non-8-bit multiple message sizes
@@ -34,6 +36,7 @@
 #define BITS_IN_BYTE 8
 
 // Hi/lo tolerance is used for pulse duration timing
+#define APND_CHARBUFF(pos,buf,arg0,arg1) (pos) = strlen(buf); sprintf(&(buf)[(pos)],arg0,arg1);
 typedef struct IRPulseLengthUsS {
     unsigned short lo;
     unsigned short val;
@@ -42,6 +45,13 @@ typedef struct IRPulseLengthUsS {
         lo = CALC_LO(_val);
         hi = CALC_HI(_val);
         val = _val;
+    }
+    char *display(char *buf, int &pos) {
+        APND_CHARBUFF(pos,buf,"%d ", val)
+        APND_CHARBUFF(pos,buf,"%d ", lo)
+        APND_CHARBUFF(pos,buf,"%d ", hi)
+        pos = strlen(buf);
+        return buf;
     }
 } IRPulseLengthUs;
 
@@ -55,13 +65,28 @@ typedef struct IRConfigS {
     IRPulseLengthUs bitZeroLength;
     IRPulseLengthUs bitOneLength;
     IRPulseLengthUs msgBreakLength;
+    char *display(char *buf) {
+        int pos = 0;
+        sprintf(buf,"\nsamples "); APND_CHARBUFF(pos,buf,"%0d ", msgSamplesCnt)
+        APND_CHARBUFF(pos,buf,"\nbits ", ""); APND_CHARBUFF(pos,buf,"%0d ", msgBitsCnt)
+        APND_CHARBUFF(pos,buf,"\nsync ", ""); APND_CHARBUFF(pos,buf,"%0d ", msgSyncCnt)
+        for(int i=0; i< msgSyncCnt; i++) {
+            APND_CHARBUFF(pos,buf,"\n ", ""); syncLengths[i].display(buf, pos);
+        }
+        APND_CHARBUFF(pos,buf,"\nsep ", "");bitSeparatorLength.display(buf, pos);
+        APND_CHARBUFF(pos,buf,"\nzro ", "");bitZeroLength.display(buf, pos);
+        APND_CHARBUFF(pos,buf,"\none ", "");bitOneLength.display(buf, pos);
+        APND_CHARBUFF(pos,buf,"\nbrk ", "");msgBreakLength.display(buf, pos);
+        pos = strlen(buf);
+        return buf;
+    }
 } IRConfig;
 
 typedef enum IRMsgStateE {Preamble, Message} IRMsgState;
 
 class IRLink {
 public:
-    IRLink(const IRConfig *_config);
+    IRLink(IRConfig *_config, uint8_t ppinX = IR_PINX, uint8_t ppinR = IR_PINR);
     ~IRLink();
     
     // NOTE: caller owns memory pointed to and it is presumed to have enough
@@ -79,7 +104,8 @@ public:
     uint8_t *loop_chkMsgReceived();
     void handler();
 
-    static const IRConfig *config;
+    static IRConfig *config;
+    static uint8_t pinX, pinR; // Assignable send/receive pins
 private:
     static volatile unsigned long timings[RING_BUFFER_SIZE];
     static volatile unsigned long lastTime;
@@ -89,7 +115,7 @@ private:
     static volatile unsigned int edgeCount1; // Count of separate messages repeated
     static volatile bool received; // Receive a single message
     static volatile IRMsgState state;
-    
+
     bool isSyncInMsg(unsigned int idx);
     bool isSync(unsigned int idx);
 };

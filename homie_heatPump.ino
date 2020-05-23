@@ -1,6 +1,6 @@
 #include <Homie.h>
 #include "src/SenvilleAURADisp.hpp"
-#include "src/IRHVACLink.hpp"
+#include "src/IRLink.hpp"
 #include "src/SenvilleAURA.hpp"
 //#define DEBUG
 
@@ -16,7 +16,7 @@ typedef enum UpdatePropertyE {
 
 const int DEFAULT_UPDATE_INTERVAL = 180; // 3 min
 
-IRHVACLink *irReceiver;
+IRLink *irReceiver;
 SenvilleAURA *senville;
 SenvilleAURADisp *disp;
 uint8_t byteMsgBuf[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
@@ -171,7 +171,7 @@ void setup() {
   // Hardware integration 
   disp = new SenvilleAURADisp();
   senville = new SenvilleAURA();
-  irReceiver = new IRHVACLink(senville->getIRHVACConfig());
+  irReceiver = new IRLink(senville->getIRConfig());
   irReceiver->listen();  
   updateFlags = UpdateProperty::All;
   setupHandler();

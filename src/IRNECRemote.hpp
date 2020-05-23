@@ -8,23 +8,30 @@
 // Command message
 #define MESSAGE_SAMPLES 1
 #define MESSAGE_BITS 32 /*  Message is 4-bytes, first byte is Addr, second byte is Addr inverted,
-                            third byte is Cmd, fourth byte is Cmd inverted */
+                            third byte is Cmd, fourth byte is Cmd inverted.  This count includes spaces. */
 #define MESSAGE_SYNC_BITS 2
 #define SYNC_PREAMBLE_0  9000.0
 #define SYNC_PREAMBLE_1  4560.0
 
-#define TOLERANCE_PERCENT 0.21f
 #define SEP_LENGTH0  500.0
 #define BIT0_LENGTH  650.0
 #define BIT1_LENGTH 1730.0
-#define EOT_LENGTH  500.0
+#define EOT_LENGTH  40000.0
 
 // Repeat message -- different preamble then an EOT pulse
 #define SYNC_PREAMBLE_1A  2280.0
 
 typedef struct irMsgS {
-    unsigned char addr;
-    unsigned char cmd;
+    uint16_t addr;
+    uint8_t cmd;
+    char *display(char *buf) {
+        int pos = 0;
+        sprintf(buf,"\nmsg.addr "); APND_CHARBUFF(pos,buf,"%0d ", addr)
+        APND_CHARBUFF(pos,buf,"\nmsg.cmd ", ""); APND_CHARBUFF(pos,buf,"%0d ", cmd)
+        pos = strlen(buf);
+        return buf;
+    }
+
 } irMsg;
 
 // Listen for b, translate to a
@@ -61,7 +68,7 @@ private:
 public:
     IRNECRemote();
 
-    const IRConfig *getIRConfig();
+    IRConfig *getIRConfig();
     
     // If msg is valid, it is copied locally into the class
     bool isValid(uint8_t *msg, bool setCRC = false);
@@ -71,6 +78,7 @@ public:
     uint8_t *rawMessage();
 
     char *toBuff(char *buf);
+    static uint8_t reverse(uint8_t b);
 };
 
 #endif IRNECRemote_hpp
