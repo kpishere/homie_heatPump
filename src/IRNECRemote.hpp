@@ -13,9 +13,9 @@
 #define SYNC_PREAMBLE_0  9000.0
 #define SYNC_PREAMBLE_1  4560.0
 
-#define SEP_LENGTH0  500.0
-#define BIT0_LENGTH  650.0
-#define BIT1_LENGTH 1730.0
+#define SEP_LENGTH0  560.0
+#define BIT0_LENGTH  560.0
+#define BIT1_LENGTH 1680.0
 #define EOT_LENGTH  40000.0
 
 // Repeat message -- different preamble then an EOT pulse

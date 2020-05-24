@@ -1,6 +1,6 @@
 #include "src/IRLink.hpp"
 #include "src/IRNECRemote.hpp"
-//#define DEBUG
+#define DEBUG
 
 typedef struct necIrCmdMapS {
     unsigned char a;
@@ -38,7 +38,7 @@ irMsg translateB2A(uint16_t in_b0, irMsg in,
         for(int i = 0; i < items; i++) {
             if(in.cmd == lmViewToAnon[i].b) {
                 out.addr = out_b0;
-                out.cmd = lmViewToAnon[i].a;
+                out.cmd = IRLink::reverse(lmViewToAnon[i].a);
                 exit;
             }
         }

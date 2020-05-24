@@ -4,7 +4,7 @@
 //  Hardware layer implementation of IR pulse signaling
 //
 #include "IRLink.hpp"
-//#define DEBUG
+#define DEBUG
 //#define DEBUG_BITS
 
 #if defined(__AVR__)

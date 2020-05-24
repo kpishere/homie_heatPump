@@ -22,7 +22,7 @@
 #define IR_PINX D1
 #endif
 
-#define TOLERANCE_PERCENT 0.12f
+#define TOLERANCE_PERCENT 0.25f
 
 // Memory allocation function for containing message sent/received
 // Note: remainder test is for non-8-bit multiple message sizes

@@ -8,7 +8,7 @@ char outputBuff[100];
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Started.");
+  Serial.println("\nStarted.");
   senville = new SenvilleAURA();
   irReceiver = new IRLink(senville->getIRConfig());
   irReceiver->listen();
@@ -30,7 +30,6 @@ void loop() {
       Serial.println(outputBuff);
 
       // Test sending value
-      delay(5000);
       Serial.println("Check sent message on scope etc.");
       irReceiver->send(senville->getMessage());      
       Serial.println("listening...");
