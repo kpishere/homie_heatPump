@@ -183,7 +183,7 @@ void IRLink::send(uint8_t *msg, bool noWait) {
                 Serial.print("synch "); Serial.print(pulsesToSend[ptr]);
                 Serial.print(" ptr "); Serial.print(ptr);
                 Serial.print(" slptr "); Serial.println(slptr);
-//                Serial.print(" == "); Serial.println(MSGSIZE(1,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
+                Serial.print(" == "); Serial.println(MSGSIZE(1,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
 #endif
             }
         }
@@ -241,10 +241,6 @@ void IRLink::send(uint8_t *msg, bool noWait) {
     Serial.print("pulses "); Serial.println(MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
     Serial.print("pulse dur "); Serial.println(duration);
 #endif
-
-    digitalWrite(IRLink::pinX,!(digitalRead(IRLink::pinX)));  //Toggle LED Pin
-    digitalWrite(IRLink::pinX,!(digitalRead(IRLink::pinX)));  //Toggle LED Pin
-
     configSend();
     cli();
     // Set array pointer to first byte
