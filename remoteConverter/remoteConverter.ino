@@ -1,6 +1,10 @@
+#include <arduino.h>
 #include "src/IRLink.hpp"
 #include "src/IRNECRemote.hpp"
-#define DEBUG
+//#define DEBUG
+
+const int XmitPin = 3; 
+const int RcvPin = 2;
 
 typedef struct necIrCmdMapS {
     unsigned char a;
@@ -26,6 +30,7 @@ necIrCmdMap lmViewToAnon[] = {
 };
 
 IRLink *irReceiver;
+IRConfig *cnf;  
 IRNECRemote *rmt;
 char outputBuff[100];
 
@@ -48,8 +53,8 @@ irMsg translateB2A(uint16_t in_b0, irMsg in,
 
 void setup() {
   char buff[800];
-  IRConfig *cnf;
 #ifdef DEBUG
+  while (! Serial);
   Serial.begin(115200);
   Serial.println("\nStarted.");
 #endif
@@ -59,7 +64,7 @@ void setup() {
   Serial.println("Signal configuration:");
   Serial.println(cnf->display(buff));
 #endif
-  irReceiver = new IRLink(cnf, D2, D1);
+  irReceiver = new IRLink(cnf, XmitPin, RcvPin);
   irReceiver->listen();  
 }
 void loop() {

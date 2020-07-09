@@ -9,7 +9,6 @@ IRNECRemote::IRNECRemote() {
     config.msgSamplesCnt = MESSAGE_SAMPLES;
     config.msgBitsCnt = MESSAGE_BITS;
     config.msgSyncCnt = MESSAGE_SYNC_BITS;
-    config.syncLengths = (IRPulseLengthUs *)malloc(sizeof(IRPulseLengthUs *)*MESSAGE_SYNC_BITS);
     config.syncLengths[0] = IRPulseLengthUsS(SYNC_PREAMBLE_0);
     config.syncLengths[1] = IRPulseLengthUsS(SYNC_PREAMBLE_1);
 

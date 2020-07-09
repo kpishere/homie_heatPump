@@ -10,19 +10,29 @@
 
 // ring buffer size has to be large enough to fit
 // data between two successive sync signals
-#define RING_BUFFER_SIZE  550
+#define RING_BUFFER_SIZE  100
 
 #if defined(__AVR__)
-#define IR_DDRPRT DDRA
-#define IR_SENDPORT PORTA
-#define IR_PINR PA3
-#define IR_PINX PA3
+    #if defined(__AVR_ATmega32U4__)
+        #define ATmega32U4_ProMicroWiring(p) ( (p==0?2:(p==1?3:(p==2?1:(p==3?0:4)))) )
+        #define IR_DDRPRT DDRD
+        #define IR_SENDPORT PORTD
+        #define IR_PINR 2
+        #define IR_PINX 2
+    #else
+        #define IR_DDRPRT DDRA
+        #define IR_SENDPORT PORTA
+        #define IR_PINR PA3
+        #define IR_PINX PA3
+    #endif
 #elif defined(ESP8266)
 #define IR_PINR D1
 #define IR_PINX D1
 #endif
 
 #define TOLERANCE_PERCENT 0.25f
+
+#define MAX_SYNCS 2
 
 // Memory allocation function for containing message sent/received
 // Note: remainder test is for non-8-bit multiple message sizes
@@ -58,7 +68,7 @@ typedef struct IRConfigS {
     uint8_t msgSamplesCnt;
     uint8_t msgBitsCnt;
     uint8_t msgSyncCnt;
-    IRPulseLengthUs *syncLengths;
+    IRPulseLengthUs syncLengths[MAX_SYNCS];
     IRPulseLengthUs bitSeparatorLength;
     IRPulseLengthUs bitZeroLength;
     IRPulseLengthUs bitOneLength;

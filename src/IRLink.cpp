@@ -4,12 +4,17 @@
 //  Hardware layer implementation of IR pulse signaling
 //
 #include "IRLink.hpp"
-#define DEBUG
+//#define DEBUG
 //#define DEBUG_BITS
 
 #if defined(__AVR__)
-// TICKS PER us for MEGA 2560
-#define IR_SEND_ADJ 2.069
+    #if defined(__AVR_ATmega32U4__)
+        // TICKS PER us 
+        #define IR_SEND_ADJ 2.069
+    #else
+        // TICKS PER us for MEGA 2560
+        #define IR_SEND_ADJ 2.069
+    #endif
 #elif defined(ESP8266)
 // Ticks per us for ESP8266
 #define IR_SEND_ADJ 5.148
@@ -52,8 +57,13 @@ void ISRHandler() {
 #if defined(__AVR__)
 ISR(TIMER1_COMPA_vect){
     cli();
-    // Toggle output value
-    IR_SENDPORT ^= _BV(IRLink::pinX);
+    #if defined(__AVR_ATmega32U4__)
+        // Toggle output value
+        IR_SENDPORT ^= _BV( ATmega32U4_ProMicroWiring(IRLink::pinX));
+    #else
+        // Toggle output value
+        IR_SENDPORT ^= _BV(IRLink::pinX);
+    #endif
     // Set next timer value
     OCR1A = pulsesToSend[tc1_ptr];
     // Increment pointer in array
@@ -63,7 +73,7 @@ ISR(TIMER1_COMPA_vect){
                             ,IRLink::config->msgSyncCnt
                             ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
-        TIMSK1 &= ~(1 << OCIE1A);
+        TIMSK1 &= ~_BV(OCIE1A);
     }
     sei();
 }
@@ -91,23 +101,30 @@ void ICACHE_RAM_ATTR onTimer1ISR(){
 void configSend() {
     cli();//stop interrupts
 #if defined(__AVR__)
-    // Setup X-mit pin
-    // Set up pin for output
-    IR_DDRPRT  |= _BV(IRLink::pinX);
-    // Set value high
-    IR_SENDPORT |= _BV(IRLink::pinX);
-    
-    // Set up timer counter
-    TCCR1A = 0;// set entire TCCR1A register to 0
-    TCCR1B = 0;// same for TCCR1B
-    TCNT1  = 0;//initialize counter value to 0
-    // turn on CTC mode
-    TCCR1B |= (1 << WGM12);
-    // Set CS11 bit for 8 prescaler (0.000,000,5s or 1/2 micro-second)
-    TCCR1B |= (1 << CS11);
-    // disable timer compare interrupt
-    TIMSK1 &= ~(1 << OCIE1A);
-    
+    #if defined(__AVR_ATmega32U4__)
+        // Setup X-mit pin
+        // Set up pin for output
+        IR_DDRPRT  |=  _BV( ATmega32U4_ProMicroWiring(IRLink::pinX) );
+        // Set value high
+        IR_SENDPORT |= _BV( ATmega32U4_ProMicroWiring(IRLink::pinX) );
+    #else
+        // Setup X-mit pin
+        // Set up pin for output
+        IR_DDRPRT  |= _BV(IRLink::pinX);
+        // Set value high
+        IR_SENDPORT |= _BV(IRLink::pinX);
+    #endif
+
+        // Set up timer counter
+        TCCR1A = 0;// set entire TCCR1A register to 0
+        TCCR1B = 0;// same for TCCR1B
+        TCNT1  = 0;//initialize counter value to 0
+        // turn on CTC mode
+        TCCR1B |= _BV(WGM12);
+        // Set CS11 bit for 8 prescaler (0.000,000,5s or 1/2 micro-second)
+        TCCR1B |= _BV(CS11);
+        // disable timer compare interrupt
+        TIMSK1 &= ~_BV(OCIE1A);
 #elif defined(ESP8266)
     timer1_isr_init();
     pinMode(IRLink::pinX,OUTPUT);
@@ -132,6 +149,10 @@ IRLink::IRLink(IRConfig *_config, uint8_t ppinX, uint8_t ppinR) {
 
     msgReceivedPtr = (uint8_t *)malloc(sizeof(uint8_t) * MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt));
     pinMode(pinR, INPUT);
+    if(pinX != pinR) {
+        pinMode(pinX, OUTPUT);
+        digitalWrite(pinX,HIGH);
+    }
 }
 IRLink::~IRLink() {
     if(pulsesToSend) free((void *)pulsesToSend);
@@ -158,11 +179,11 @@ void IRLink::send(uint8_t *msg, bool noWait) {
         for(slptr = 0; slptr < config->msgSyncCnt; slptr++) {
             if(ptr % (MSGSIZE(1,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val)) == slptr) {
                 pulsesToSend[ptr] = config->syncLengths[slptr].val;
-#ifdef DEBUG
+#ifdef DEBUG_BITS
                 Serial.print("synch "); Serial.print(pulsesToSend[ptr]);
                 Serial.print(" ptr "); Serial.print(ptr);
-                Serial.print(" slptr "); Serial.print(slptr);
-                Serial.print(" == "); Serial.println(MSGSIZE(1,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
+                Serial.print(" slptr "); Serial.println(slptr);
+//                Serial.print(" == "); Serial.println(MSGSIZE(1,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
 #endif
             }
         }
@@ -220,6 +241,10 @@ void IRLink::send(uint8_t *msg, bool noWait) {
     Serial.print("pulses "); Serial.println(MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
     Serial.print("pulse dur "); Serial.println(duration);
 #endif
+
+    digitalWrite(IRLink::pinX,!(digitalRead(IRLink::pinX)));  //Toggle LED Pin
+    digitalWrite(IRLink::pinX,!(digitalRead(IRLink::pinX)));  //Toggle LED Pin
+
     configSend();
     cli();
     // Set array pointer to first byte
@@ -228,7 +253,7 @@ void IRLink::send(uint8_t *msg, bool noWait) {
     // Set first comparitor value to trigger in short time
     OCR1A =  (config->syncLengths[0].val * IR_SEND_ADJ) + 0.5;
     // enable timer compare interrupt
-    TIMSK1 |= (1 << OCIE1A);
+    TIMSK1 |= _BV(OCIE1A);
 #elif defined(ESP8266)
     //Initialize Ticker every 5 ticks/us - 1677721.4 us max
     timer1_attachInterrupt(onTimer1ISR);
