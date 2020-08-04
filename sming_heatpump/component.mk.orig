@@ -1,0 +1,11 @@
+DISABLE_SPIFFS = 1
+
+ifdef MQTT_URL
+	USER_CFLAGS += -DMQTT_URL=\"$(MQTT_URL)\"
+endif
+
+WIFI_SSID = "SSIDGoesHere"
+WIFI_PWD = "PasswordGoesHere"
+
+## size of the flash chip
+SPI_SIZE  ?= 4M

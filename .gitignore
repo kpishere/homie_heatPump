@@ -2,3 +2,4 @@
 *.bin
 *.xcodeproj
 *.json
+sming_heatpump/component.mk

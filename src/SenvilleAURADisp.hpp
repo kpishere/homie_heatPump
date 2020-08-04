@@ -1,6 +1,6 @@
 //
 //  SenvilleAURADisp.hpp
-//  
+//
 /*
  * Replacement for Senville Display - NodeMCU v3 ESP8266-12E
  *
@@ -81,18 +81,22 @@
 #define SenvilleAURADisp_hpp
 
 #include <stdio.h>
+#ifdef ARDUINO_LIBRARIES
 #include "Arduino.h"
+#else
+#include <SmingCore.h>
+#endif
 
 #define DISPLAY_BYTE_SIZE 3
-#define LED_INTER D2
-#define CLK_HSPI D5
-#define DATA_MOSI D7
+#define LED_INTER 2
+#define CLK_HSPI 5
+#define DATA_MOSI 7
 
 #define DISP_MAXSTRINGPERCODE 3
 typedef struct displyMapAsciiS {
     uint8_t dispCode;
     char asciiVal[DISP_MAXSTRINGPERCODE];
-    displyMapAsciiS(uint8_t code, char ascii[]) {
+    displyMapAsciiS(uint8_t code, const char *ascii) {
         dispCode = code;
         memcpy(asciiVal,ascii,DISP_MAXSTRINGPERCODE * sizeof(char));
     }

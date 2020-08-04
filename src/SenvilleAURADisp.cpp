@@ -1,13 +1,18 @@
 //
 //  SenvilleAURADisp.cpp
-//  
+//
 //
 //  Created by Kevin Peck on 2018-12-29.
 //
 
 #include "SenvilleAURADisp.hpp"
-#include "Arduino.h"
 //#define DEBUG
+
+
+#if defined(__AVR__)
+#else // defined(ESP8266)
+    #define digitalPinToInterrupt(a) (a)
+#endif
 
 #define BITSINBYTE 8
 // The LSB of the display toggles between 1/0 with each scan but isn't connected to output
@@ -138,21 +143,21 @@ bool SenvilleAURADisp::hasUpdate() {
         if(i < DISP_LEDS)
             spaces += (displayBuff[i] == DISPLAY_MASK ? 1 : 0);
     }
-    if(spaces>0) return false; 
+    if(spaces>0) return false;
     if(!newVal) this->listenStop();
     return !newVal;
 }
 #define APND_CHARBUFF(pos,buf,arg0,arg1) (pos) = strlen(buf); sprintf(&(buf)[(pos)],arg0,arg1);
 char *SenvilleAURADisp::toBuff(char *buf) {
     int pos = 0;
-    sprintf(buf,"{"STAT_DISPRAW":0x");
+    sprintf(buf,"{" STAT_DISPRAW ":0x");
     for(uint8_t ptr = 0; ptr < DISP_LEDS; ptr++) {
-        APND_CHARBUFF(pos,buf,(displayBuff[ptr]<0x10?"0":""), "")
+        APND_CHARBUFF(pos,buf,(displayBuff[ptr]<0x10?"0%s":"%s"), "")
         APND_CHARBUFF(pos,buf,"%0X", displayBuff[ptr])
     }
-    APND_CHARBUFF(pos,buf,", "STAT_DISP":\"%s", displayBytetoAscii(displayBuff[DISP_CHAR1]))
+    APND_CHARBUFF(pos,buf,", " STAT_DISP ":\"%s", displayBytetoAscii(displayBuff[DISP_CHAR1]))
     APND_CHARBUFF(pos,buf,"%s\"", displayBytetoAscii(displayBuff[DISP_CHAR2]))
-    APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d }", millis())
+    APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld }", millis())
     return buf;
 }
 // Read next bit - flag when full byte ready

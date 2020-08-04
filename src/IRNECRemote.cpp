@@ -53,8 +53,8 @@ char *IRNECRemote::toBuff(char *buf) {
     irMsg m = this->getMessage();
     int pos = 0;
     sprintf(buf,"0x");
-    APND_CHARBUFF(pos,buf,"%04hX ", m.addr)
-    APND_CHARBUFF(pos,buf,"%02hX ", m.cmd)
+    pos = strlen(buf); sprintf(&(buf)[(pos)],"%04hX ", m.addr);
+    pos = strlen(buf); sprintf(&(buf)[(pos)],"%02hX ", m.cmd);
     pos = strlen(buf);
     return buf;
 }

@@ -7,7 +7,11 @@
 #define SenvilleAURA_hpp
 
 #include <stdio.h>
+#ifdef ARDUINO_LIBRARIES
 #include "Arduino.h"
+#else
+#include <SmingCore.h>
+#endif
 #include "IRLink.hpp"
 
 /* Notes on waveform configured below :
@@ -15,7 +19,7 @@
  *  - Two transitions count one pulse width, possibly a bit, but also a space, mark, etc.
  *
  *  - In the configuration below, the waveform is roughly :
- 
+
  |__|--|_|-|............|_|--- and the data repeats once but with reverse bit logic of the second frame
         | |
         | | Bit
@@ -27,11 +31,11 @@
     |        | Bit separator then data bit
     |
     | Two synch preamble pulses
- 
+
  Some sample commands in JSON syntax using fromJsonBuff() :
- 
+
  Turn AC on and set temp :  {Instr:1, IsOn:1, Mode:0, FanSpeed:0, SetTemp:24}
- 
+
  */
 
 #define MESSAGE_SAMPLES 2
@@ -40,6 +44,7 @@
 #define SYNC_PREAMBLE_0  4100.0
 #define SYNC_PREAMBLE_1  4320.0
 
+#undef TOLERANCE_PERCENT
 #define TOLERANCE_PERCENT 0.21f
 #define SEP_LENGTH0  500.0
 #define BIT0_LENGTH  500.0
@@ -94,7 +99,7 @@ private:
 
 public:
     SenvilleAURA();
-    
+
     IRConfig *getIRConfig();
 
     // If msg is valid, it is copied locally into the class
@@ -109,17 +114,17 @@ public:
 
     // Control Options
     Instruction getInstructionType();
-    
+
     bool getPowerOn();
     void setPowerOn(bool newState);
-    
+
     Mode getMode();
     void setMode(Mode val);
 
     // No fan control in AUTO or DRY modes
     FanSpeed getFanSpeed();
     void     setFanSpeed(FanSpeed val);
-    
+
     // Avalable in COOL, HEAT, or AUTO modes only
     // Cancels when Mode canged, FAN SPEED changed or ON/OFF pressed
     bool getSleepOn();
@@ -140,17 +145,17 @@ public:
 
     uint8_t  getTimeOff();
     void setTimeOff(uint8_t hour);
-    
+
     uint8_t  getTimeOn();
     void setTimeOn(uint8_t hour);
-    
+
     uint8_t getFollowMeTemp();
     FollowMeState getFollowMeState();
     // Make option command - Follow Me, there are three states, new, update temp, and stop
     //   Note: Heat pump expects an update in measured temperature every 3 minutes
     static SenvilleAURA *followMeCmd(SenvilleAURA *fromState, FollowMeState newState,
                                      uint8_t measuredTemp);
-    
+
     unsigned long  getOnTimeMs();
     unsigned long  getSeqId();
 };

@@ -1,12 +1,16 @@
 //
 //  IRLink.hpp
-//  
+//
 
 #ifndef IRLink_hpp
 #define IRLink_hpp
 
 #include <stdio.h>
+#ifdef ARDUINO_LIBRARIES
 #include "Arduino.h"
+#else
+#include <SmingCore.h>
+#endif
 
 #if defined(__AVR__)
     // ring buffer size has to be large enough to fit
@@ -25,10 +29,11 @@
         #define IR_PINR PA3
         #define IR_PINX PA3
     #endif
-#elif defined(ESP8266)
+#else // defined(ESP8266)
+    #define digitalPinToInterrupt(a) (a)
     #define RING_BUFFER_SIZE  550
-    #define IR_PINR D1
-    #define IR_PINX D1
+    #define IR_PINR 1
+    #define IR_PINX 1
 #endif
 
 #define TOLERANCE_PERCENT 0.25f
@@ -45,7 +50,6 @@
 #define BITS_IN_BYTE 8
 
 // Hi/lo tolerance is used for pulse duration timing
-#define APND_CHARBUFF(pos,buf,arg0,arg1) (pos) = strlen(buf); sprintf(&(buf)[(pos)],arg0,arg1);
 typedef struct IRPulseLengthUsS {
     unsigned short lo;
     unsigned short val;
@@ -56,9 +60,9 @@ typedef struct IRPulseLengthUsS {
         val = _val;
     }
     char *display(char *buf, int &pos) {
-        APND_CHARBUFF(pos,buf,"%d ", val)
-        APND_CHARBUFF(pos,buf,"%d ", lo)
-        APND_CHARBUFF(pos,buf,"%d ", hi)
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",val);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",lo);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",hi);
         pos = strlen(buf);
         return buf;
     }
@@ -76,16 +80,19 @@ typedef struct IRConfigS {
     IRPulseLengthUs msgBreakLength;
     char *display(char *buf) {
         int pos = 0;
-        sprintf(buf,"\nsamples "); APND_CHARBUFF(pos,buf,"%0d ", msgSamplesCnt)
-        APND_CHARBUFF(pos,buf,"\nbits ", ""); APND_CHARBUFF(pos,buf,"%0d ", msgBitsCnt)
-        APND_CHARBUFF(pos,buf,"\nsync ", ""); APND_CHARBUFF(pos,buf,"%0d ", msgSyncCnt)
+        sprintf(buf,"\nsamples ");
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",msgSamplesCnt);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\nbits ");
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",msgBitsCnt);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\nsync ");
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",msgSyncCnt);
         for(int i=0; i< msgSyncCnt; i++) {
-            APND_CHARBUFF(pos,buf,"\n ", ""); syncLengths[i].display(buf, pos);
+            pos = strlen(buf); sprintf(&(buf)[(pos)],"\n "); syncLengths[i].display(buf, pos);
         }
-        APND_CHARBUFF(pos,buf,"\nsep ", "");bitSeparatorLength.display(buf, pos);
-        APND_CHARBUFF(pos,buf,"\nzro ", "");bitZeroLength.display(buf, pos);
-        APND_CHARBUFF(pos,buf,"\none ", "");bitOneLength.display(buf, pos);
-        APND_CHARBUFF(pos,buf,"\nbrk ", "");msgBreakLength.display(buf, pos);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\nsep ");bitSeparatorLength.display(buf, pos);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\nzro ");bitZeroLength.display(buf, pos);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\none ");bitOneLength.display(buf, pos);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\nbrk ");msgBreakLength.display(buf, pos);
         pos = strlen(buf);
         return buf;
     }
@@ -97,16 +104,16 @@ class IRLink {
 public:
     IRLink(IRConfig *_config, uint8_t ppinX = IR_PINX, uint8_t ppinR = IR_PINR);
     ~IRLink();
-    
+
     // NOTE: caller owns memory pointed to and it is presumed to have enough
     // valid data to satisfy the IRConfig defintion of the message
     // Wait is for message to be sent.  Otherwise, if you call listen() right away, you'll get a
     // feedback loop (good for memory leak testing!)
     void send(uint8_t *msg, bool noWait = false);
-    
+
     void listen(); // pin is re-defined for listening
     void listenStop(); // Stops interrupts, important for serial communication etc.
-    
+
     /// REturns NULL if no measurement otherwise memory buffer pointer to newly received message
     /// NOTE: DO NOT release this memory!  It is allocated once on class creation.
     /// (this is a change from prior code)
@@ -115,7 +122,7 @@ public:
 
     static IRConfig *config;
     static uint8_t pinX, pinR; // Assignable send/receive pins
-    
+
     // Utillity methods
     static uint8_t reverse(uint8_t b);
 private:

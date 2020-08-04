@@ -2,7 +2,11 @@
 #define IRNECRemote_hpp
 
 #include <stdio.h>
+#ifdef ARDUINO_LIBRARIES
 #include "Arduino.h"
+#else
+#include <SmingCore.h>
+#endif
 #include "IRLink.hpp"
 
 // Command message
@@ -26,8 +30,10 @@ typedef struct irMsgS {
     uint8_t cmd;
     char *display(char *buf) {
         int pos = 0;
-        sprintf(buf,"\nmsg.addr "); APND_CHARBUFF(pos,buf,"%0d ", addr)
-        APND_CHARBUFF(pos,buf,"\nmsg.cmd ", ""); APND_CHARBUFF(pos,buf,"%0d ", cmd)
+        sprintf(buf,"\nmsg.addr ");
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%0d ", addr);
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"\nmsg.cmd ");
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",cmd);        
         pos = strlen(buf);
         return buf;
     }
@@ -69,7 +75,7 @@ public:
     IRNECRemote();
 
     IRConfig *getIRConfig();
-    
+
     // If msg is valid, it is copied locally into the class
     bool isValid(uint8_t *msg, bool setCRC = false);
     irMsg getMessage();
@@ -80,4 +86,4 @@ public:
     char *toBuff(char *buf);
 };
 
-#endif IRNECRemote_hpp
+#endif //IRNECRemote_hpp

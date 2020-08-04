@@ -53,7 +53,6 @@ SenvilleAURA::SenvilleAURA() {
     config.msgSamplesCnt = MESSAGE_SAMPLES;
     config.msgBitsCnt = MESSAGE_BITS;
     config.msgSyncCnt = MESSAGE_SYNC_BITS;
-    config.syncLengths = (IRPulseLengthUs *)malloc(sizeof(IRPulseLengthUs *)*MESSAGE_SYNC_BITS);
     config.syncLengths[0] = IRPulseLengthUsS(SYNC_PREAMBLE_0);
     config.syncLengths[1] = IRPulseLengthUsS(SYNC_PREAMBLE_1);
 
@@ -122,52 +121,52 @@ char *SenvilleAURA::toBuff(char *buf) {
         APND_CHARBUFF(pos,buf,"%0X ", message[ptr])
     }
     pos = strlen(buf);
-    sprintf(&buf[pos], "%d %d", this->sampleId, this->lastSampleMs);
+    sprintf(&buf[pos], "%ld %ld", this->sampleId, this->lastSampleMs);
     return buf;
 }
 char *SenvilleAURA::toJsonBuff(char *buf) {
     int pos = 0, i;
-    sprintf(buf,"");
+    buf[0] = 0x00;
     switch(this->getInstructionType()) {
         case Instruction::Command:
-            APND_CHARBUFF(pos,buf,"{"CMD_ISON":%d ", this->getPowerOn())
-            APND_CHARBUFF(pos,buf,", "CMD_INSTR":%d ", this->getInstructionType())
-            APND_CHARBUFF(pos,buf,", "CMD_MODE":%d ", this->getMode())
-            APND_CHARBUFF(pos,buf,", "CMD_FSPD":%d ", this->getFanSpeed())
-            APND_CHARBUFF(pos,buf,", "CMD_SLP":%d ", this->getSleepOn())
-            APND_CHARBUFF(pos,buf,", "CMD_STMP":%d ", this->getSetTemp())
-            APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
-            APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
+            APND_CHARBUFF(pos,buf,"{" CMD_ISON ":%d ", this->getPowerOn())
+            APND_CHARBUFF(pos,buf,", " CMD_INSTR ":%d ", this->getInstructionType())
+            APND_CHARBUFF(pos,buf,", " CMD_MODE ":%d ", this->getMode())
+            APND_CHARBUFF(pos,buf,", " CMD_FSPD ":%d ", this->getFanSpeed())
+            APND_CHARBUFF(pos,buf,", " CMD_SLP ":%d ", this->getSleepOn())
+            APND_CHARBUFF(pos,buf,", " CMD_STMP ":%d ", this->getSetTemp())
+            APND_CHARBUFF(pos,buf,", " STAT_SMPLID ":%ld ", this->getSeqId())
+            APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld ", this->getOnTimeMs())
             break;
         case Instruction::FollowMe:
-            APND_CHARBUFF(pos,buf,"{"CMD_ISON":%d ", this->getPowerOn())
-            APND_CHARBUFF(pos,buf,", "CMD_INSTR":%d ", this->getInstructionType())
-            APND_CHARBUFF(pos,buf,", "CMD_MODE":%d ", this->getMode())
-            APND_CHARBUFF(pos,buf,", "CMD_FSPD":%d ", this->getFanSpeed())
-            APND_CHARBUFF(pos,buf,", "CMD_SLP":%d ", this->getSleepOn())
-            APND_CHARBUFF(pos,buf,", "CMD_MTMP":%d ", this->getFollowMeTemp())
-            APND_CHARBUFF(pos,buf,", "CMD_STATE":%d ", this->getFollowMeState())
-            APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
-            APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
+            APND_CHARBUFF(pos,buf,"{" CMD_ISON ":%d ", this->getPowerOn())
+            APND_CHARBUFF(pos,buf,", " CMD_INSTR ":%d ", this->getInstructionType())
+            APND_CHARBUFF(pos,buf,", " CMD_MODE ":%d ", this->getMode())
+            APND_CHARBUFF(pos,buf,", " CMD_FSPD ":%d ", this->getFanSpeed())
+            APND_CHARBUFF(pos,buf,", " CMD_SLP ":%d ", this->getSleepOn())
+            APND_CHARBUFF(pos,buf,", " CMD_MTMP ":%d ", this->getFollowMeTemp())
+            APND_CHARBUFF(pos,buf,", " CMD_STATE ":%d ", this->getFollowMeState())
+            APND_CHARBUFF(pos,buf,", " STAT_SMPLID ":%ld ", this->getSeqId())
+            APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld ", this->getOnTimeMs())
             break;
         case Instruction::InstrOption:
-            APND_CHARBUFF(pos,buf,"{"CMD_INSTR":%d ", this->getInstructionType())
-            APND_CHARBUFF(pos,buf,", "CMD_OPT":%d ", this->getOption())
-            APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
-            APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
+            APND_CHARBUFF(pos,buf,"{" CMD_INSTR ":%d ", this->getInstructionType())
+            APND_CHARBUFF(pos,buf,", " CMD_OPT ":%d ", this->getOption())
+            APND_CHARBUFF(pos,buf,", " STAT_SMPLID ":%ld ", this->getSeqId())
+            APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld ", this->getOnTimeMs())
             break;
         default: // Unsupported
 #ifdef SHOW_RAWDATA
-            APND_CHARBUFF(pos,buf,"{"STAT_RAW":0x", "")
+            APND_CHARBUFF(pos,buf,"{" STAT_RAW ":0x%s", "")
             for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++) {
                 APND_CHARBUFF(pos,buf,"%0X ",message[i])
             }
-            APND_CHARBUFF(pos,buf,", "STAT_SMPLID":%d ", this->getSeqId())
-            APND_CHARBUFF(pos,buf,", "STAT_ONTME":%d ", this->getOnTimeMs())
+            APND_CHARBUFF(pos,buf,", " STAT_SMPLID ":%ld ", this->getSeqId())
+            APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld ", this->getOnTimeMs())
 #endif
             break;
     }
-    APND_CHARBUFF(pos,buf,"}", "")
+    APND_CHARBUFF(pos,buf,"}%s", "")
     return buf;
 }
 bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
@@ -179,17 +178,18 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
     FollowMeState fms;
     Option opt;
     Instruction thisInstr;
-    DynamicJsonBuffer  jsonBuffer(JSON_PARSEBUFFER);
-    JsonObject& root = jsonBuffer.parseObject(buf);
-    
+    DynamicJsonDocument root(JSON_PARSEBUFFER);
+    auto error = deserializeJson(root, buf);
+
     // Test if parsing succeeds.
-    if (!root.success()) {
-#ifdef DEBUG
-        Serial.println("parseObject() failed");
-#endif
-        return false;
+    if (error) {
+      #ifdef DEBUG
+      Serial.print("parseObject() failed with code ");
+      Serial.println(error.c_str());
+      #endif
+      return false;
     }
-    
+
     if(root.containsKey(CMD_INSTR)) {
         thisInstr = static_cast<Instruction>(root[CMD_INSTR].as<uint8_t>());
         this->setInstructionType(Instruction::Command);

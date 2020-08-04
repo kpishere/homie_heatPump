@@ -1,21 +1,23 @@
 //
 //  IRLink.cpp
-//  
+//
 //  Hardware layer implementation of IR pulse signaling
 //
 #include "IRLink.hpp"
+#include <HardwareTimer.h>
+#include <pins_arduino.h>
 //#define DEBUG
 //#define DEBUG_BITS
 
 #if defined(__AVR__)
     #if defined(__AVR_ATmega32U4__)
-        // TICKS PER us 
+        // TICKS PER us
         #define IR_SEND_ADJ 2.069
     #else
         // TICKS PER us for MEGA 2560
         #define IR_SEND_ADJ 2.069
     #endif
-#elif defined(ESP8266)
+#else //defined(ESP8266)
 // Ticks per us for ESP8266
 #define IR_SEND_ADJ 5.148
 #endif
@@ -78,12 +80,12 @@ ISR(TIMER1_COMPA_vect){
     sei();
 }
 #elif defined(ESP8266)
-void ICACHE_RAM_ATTR onTimer1ISR(){
+void ICACHE_RAM_ATTR onTimer1ISR(void *argptr){
     cli();
     // Toggle output value
     digitalWrite(IRLink::pinX,!(digitalRead(IRLink::pinX)));  //Toggle LED Pin
     // Set next timer value
-    timer1_write(pulsesToSend[tc1_ptr]);
+    hw_timer1_write(pulsesToSend[tc1_ptr]);
     // Increment pointer in array
     tc1_ptr++;
     // If at end, stop
@@ -91,7 +93,7 @@ void ICACHE_RAM_ATTR onTimer1ISR(){
                             ,IRLink::config->msgSyncCnt
                             ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
-        timer1_disable();
+        hw_timer1_disable();
         pinMode(IRLink::pinX,INPUT);
     }
     sei();
@@ -126,7 +128,7 @@ void configSend() {
         // disable timer compare interrupt
         TIMSK1 &= ~_BV(OCIE1A);
 #elif defined(ESP8266)
-    timer1_isr_init();
+    hw_timer_init();
     pinMode(IRLink::pinX,OUTPUT);
     digitalWrite(IRLink::pinX,HIGH);
 #endif
@@ -173,7 +175,7 @@ void IRLink::listenStop() {
 void IRLink::send(uint8_t *msg, bool noWait) {
     short ptr, slptr;
     unsigned int duration = 0;
-                                
+
     for(ptr = 0; ptr < MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val); ptr++ ) {
         // The synch pulses
         for(slptr = 0; slptr < config->msgSyncCnt; slptr++) {
@@ -252,10 +254,10 @@ void IRLink::send(uint8_t *msg, bool noWait) {
     TIMSK1 |= _BV(OCIE1A);
 #elif defined(ESP8266)
     //Initialize Ticker every 5 ticks/us - 1677721.4 us max
-    timer1_attachInterrupt(onTimer1ISR);
+    hw_timer1_attach_interrupt((hw_timer_source_type_t)0,onTimer1ISR, nullptr);
     // Set first comparitor value to trigger in short time & enable interrupt
-    timer1_enable(TIM_DIV16, TIM_EDGE, TIM_SINGLE);
-    timer1_write((config->syncLengths[0].val * IR_SEND_ADJ) + 0.5);
+    hw_timer1_enable(TIMER_CLKDIV_16, TIMER_EDGE_INT, TIMER_FRC1_SOURCE);
+    hw_timer1_write((config->syncLengths[0].val * IR_SEND_ADJ) + 0.5);
 #endif
     sei();
     if(!noWait) delay(duration / 100);
@@ -282,13 +284,13 @@ void IRLink::handler() {
     // calculating timing since last change
     unsigned long time = micros();
     duration = diffRollSafeUnsignedLong(lastTime,time);
-    
+
     lastTime = time;
-    
+
     // store data in ring buffer
     ringIndex = (ringIndex + 1) % RING_BUFFER_SIZE;
     timings[ringIndex] = duration;
-    
+
     switch(state) {
         case Preamble:
             if(isSync(ringIndex)) {
@@ -319,7 +321,7 @@ void IRLink::handler() {
 uint8_t *IRLink::loop_chkMsgReceived() {
     byte *result = NULL;
     unsigned int bitInMsg = 0;
-    
+
     if (received == true) {
 #ifdef DEBUG
          Serial.print("preamble: ");
@@ -336,7 +338,7 @@ uint8_t *IRLink::loop_chkMsgReceived() {
         for(unsigned int i=config->msgSyncCnt; i<(edgeCount-config->msgSyncCnt); i+=2) {
             unsigned long t0 = timings[(syncIndex1+RING_BUFFER_SIZE-config->msgSyncCnt+i+1) % RING_BUFFER_SIZE]
                 ,         t1 = timings[(syncIndex1+RING_BUFFER_SIZE-config->msgSyncCnt+i+1+1) % RING_BUFFER_SIZE];
-            
+
 #ifdef DEBUG
             Serial.print(" ");
             Serial.print(i);
