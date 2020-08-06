@@ -30,10 +30,11 @@
         #define IR_PINX PA3
     #endif
 #else // defined(ESP8266)
-    #define digitalPinToInterrupt(a) (a)
+    #define 	ESP_MAX_INTERRUPTS   16
+    #define 	digitalPinToInterrupt(p)   ( (p) < ESP_MAX_INTERRUPTS ? (p) : -1 )
     #define RING_BUFFER_SIZE  550
-    #define IR_PINR 1
-    #define IR_PINX 1
+    #define IR_PINR 5 /*GPIO5 - Pin D1*/
+    #define IR_PINX 5 /*GPIO5 - Pin D1*/
 #endif
 
 #define TOLERANCE_PERCENT 0.25f

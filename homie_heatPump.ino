@@ -39,14 +39,14 @@ void setupHandler() {
     if(updateFlags & UpdateProperty::UpdateControl) {
       // Always get update to get sample time
       senville->toJsonBuff((char *)controlBuff);
-  
+
       strVal = String((const char *)controlBuff);
-      controlNode0.setProperty("control").send(strVal);      
+      controlNode0.setProperty("control").send(strVal);
     }
     if(updateFlags & UpdateProperty::Display) {
       // Always get update to get sample time
       disp->toBuff((char *)displayBuff);
-      
+
       strVal = String((const char *)displayBuff);
       controlNode0.setProperty("display").send(strVal);
     }
@@ -63,7 +63,7 @@ void loopHandler() {
   } else {
     ESP.wdtFeed();
   }
-  
+
   // Check display hardware
   if(disp->hasUpdate()) {
 #ifdef DEBUG
@@ -82,13 +82,13 @@ void loopHandler() {
     for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
       Serial.printf("%0X ",mem[i]);
     Serial.println();
-#endif 
+#endif
     if(senville->isValid(mem)) {
 #ifdef DEBUG
       Serial.print("Validated message : ");
       senville->toBuff((char *)controlBuff);
       Serial.println((char *)controlBuff);
-#endif 
+#endif
 #ifdef DEBUG
       senville->toJsonBuff((char *)controlBuff);
       Serial.println((char *)controlBuff);
@@ -97,7 +97,7 @@ void loopHandler() {
     }
     irReceiver->listen();
   }
-  
+
   // Update Homie properties
   if(thisUpdate - lastUpdate >= updateIntervalSetting.get() * 1000UL || lastUpdate == 0) {
     updateFlags = UpdateProperty::All;
@@ -127,7 +127,7 @@ bool propertyHandler(Property prop, const HomieRange& range, const String& value
         for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
           Serial.printf("%0X ",byteMsgBuf[i]);
         Serial.println();
-#endif         
+#endif
         irReceiver->send(byteMsgBuf,true);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
         irReceiver->listen();
       } else {
@@ -146,18 +146,18 @@ void setup() {
   lastUpdate = 0;
   controlBuff = (char *)malloc(sizeof(char) * maxBuffLen);
   displayBuff = (char *)malloc(sizeof(char) * maxBuffLen);
-  
-#ifdef DEBUG  
+
+#ifdef DEBUG
   Serial.begin(115200);
-  Serial.setDebugOutput(true);  
+  Serial.setDebugOutput(true);
   Serial << endl << endl;
 #endif
 
   // Homie setup
   Homie_setFirmware(FW_NAME, FW_VERSION);
   Homie.setSetupFunction(setupHandler).setLoopFunction(loopHandler);
-#ifndef DEBUG  
-  Homie.disableLogging(); 
+#ifndef DEBUG
+  Homie.disableLogging();
 #endif
   controlNode0.advertise("control").settable(propertyControlHandler);
   controlNode0.advertise("display");
@@ -167,12 +167,12 @@ void setup() {
   });
 
   Homie.setup();
-  
-  // Hardware integration 
+
+  // Hardware integration
   disp = new SenvilleAURADisp();
   senville = new SenvilleAURA();
   irReceiver = new IRLink(senville->getIRConfig());
-  irReceiver->listen();  
+  irReceiver->listen();
   updateFlags = UpdateProperty::All;
   setupHandler();
 }

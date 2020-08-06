@@ -1,4 +1,16 @@
-DISABLE_SPIFFS = 1
+#
+# Build with this: make CFLAGS+="-Wformat-extra-args -Wformat"
+#
+COM_PORT_ESPTOOL=/dev/cu.wchusbserial1470
+SMING_ARCH=Esp8266
+SPI_SIZE=4M
+SPI_MODE=dio
+COM_SPEED_ESPTOOL=74880
+DISABLE_SPIFFS=1
+ESP8266=1
+ifdef MQTT_URL
+	USER_CFLAGS += -DMQTT_URL=\"$(MQTT_URL)\"
+endif
 
 ifdef MQTT_URL
 	USER_CFLAGS += -DMQTT_URL=\"$(MQTT_URL)\"
@@ -8,4 +20,8 @@ WIFI_SSID = "SSIDGoesHere"
 WIFI_PWD = "PasswordGoesHere"
 
 ## size of the flash chip
-SPI_SIZE  ?= 4M
+SPI_SIZE?=4M
+
+#CFLAGS+="-Wformat-extra-args -Wformat"
+
+ARDUINO_LIBRARIES 	:= ArduinoJson6

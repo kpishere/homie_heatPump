@@ -88,9 +88,9 @@
 #endif
 
 #define DISPLAY_BYTE_SIZE 3
-#define LED_INTER 2
-#define CLK_HSPI 5
-#define DATA_MOSI 7
+#define LED_INTER 4 /* GPIO4 - Pin D2 */
+#define CLK_HSPI 14  /* GPIO14 - Pin D5 */
+#define DATA_MOSI 13  /* GPIO13 - Pin D7 */
 
 #define DISP_MAXSTRINGPERCODE 3
 typedef struct displyMapAsciiS {

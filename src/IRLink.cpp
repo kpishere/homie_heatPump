@@ -5,7 +5,10 @@
 //
 #include "IRLink.hpp"
 #include <HardwareTimer.h>
+#if defined(__AVR__)
+#else // defined(ESP8266)
 #include <pins_arduino.h>
+#endif
 //#define DEBUG
 //#define DEBUG_BITS
 
@@ -44,14 +47,14 @@ const unsigned char byteMask[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x0
 int volatile tc1_ptr;
 #if defined(__AVR__)
     unsigned short volatile *pulsesToSend;
-#elif defined(ESP8266)
+#else // defined(ESP8266)
     uint32_t volatile *pulsesToSend;
 #endif
 
 // Only one instance of this class is supported, the last
 // class to invoke listen() wins.  First class to exit disables interrupt.
 IRLink *lastInstance;
-void ISRHandler() {
+void IRAM_ATTR ISRHandler() {
     if(lastInstance) lastInstance->handler();
 }
 
@@ -79,7 +82,7 @@ ISR(TIMER1_COMPA_vect){
     }
     sei();
 }
-#elif defined(ESP8266)
+#else // defined(ESP8266)
 void ICACHE_RAM_ATTR onTimer1ISR(void *argptr){
     cli();
     // Toggle output value
@@ -127,7 +130,7 @@ void configSend() {
         TCCR1B |= _BV(CS11);
         // disable timer compare interrupt
         TIMSK1 &= ~_BV(OCIE1A);
-#elif defined(ESP8266)
+#else // defined(ESP8266)
     hw_timer_init();
     pinMode(IRLink::pinX,OUTPUT);
     digitalWrite(IRLink::pinX,HIGH);
@@ -145,12 +148,14 @@ IRLink::IRLink(IRConfig *_config, uint8_t ppinX, uint8_t ppinR) {
     pinR = ppinR;
 #if defined(__AVR__)
     pulsesToSend = (unsigned short *)malloc(sizeof(unsigned short)*MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
-#elif defined(ESP8266)
+#else // defined(ESP8266)
     pulsesToSend = (uint32_t *)malloc(sizeof(uint32_t)*MSGSIZE(config->msgSamplesCnt,config->msgBitsCnt,config->msgSyncCnt,config->msgBreakLength.val));
 #endif
 
     msgReceivedPtr = (uint8_t *)malloc(sizeof(uint8_t) * MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt));
-    pinMode(pinR, INPUT);
+#ifdef DEBUG
+    Serial.print("IRLink::IRLink");
+#endif
     if(pinX != pinR) {
         pinMode(pinX, OUTPUT);
         digitalWrite(pinX,HIGH);
@@ -168,6 +173,7 @@ void IRLink::listen() {
     // Clear msgReceivedPtr
     if(msgReceivedPtr != NULL) for(int i=0; i<MSGSIZE_BYTES(config->msgSamplesCnt,config->msgBitsCnt); i++) msgReceivedPtr[i] = 0;
     attachInterrupt(digitalPinToInterrupt(pinR), ISRHandler, CHANGE);
+    pinMode(pinR, INPUT);
 }
 void IRLink::listenStop() {
     detachInterrupt(digitalPinToInterrupt(pinR));
@@ -252,7 +258,7 @@ void IRLink::send(uint8_t *msg, bool noWait) {
     OCR1A =  (config->syncLengths[0].val * IR_SEND_ADJ) + 0.5;
     // enable timer compare interrupt
     TIMSK1 |= _BV(OCIE1A);
-#elif defined(ESP8266)
+#else // defined(ESP8266)
     //Initialize Ticker every 5 ticks/us - 1677721.4 us max
     hw_timer1_attach_interrupt((hw_timer_source_type_t)0,onTimer1ISR, nullptr);
     // Set first comparitor value to trigger in short time & enable interrupt

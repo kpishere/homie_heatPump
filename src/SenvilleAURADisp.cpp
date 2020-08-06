@@ -8,10 +8,11 @@
 #include "SenvilleAURADisp.hpp"
 //#define DEBUG
 
-
 #if defined(__AVR__)
 #else // defined(ESP8266)
-    #define digitalPinToInterrupt(a) (a)
+#include <pins_arduino.h>
+#define 	ESP_MAX_INTERRUPTS   16
+#define 	digitalPinToInterrupt(p)   ( (p) < ESP_MAX_INTERRUPTS ? (p) : -1 )
 #endif
 
 #define BITSINBYTE 8
@@ -76,10 +77,10 @@ const DisplayMapAscii SenvilleAURADisp::displayMap[] = {
 // Only one instance of this class is supported, the last
 // class to invoke listen() wins.  First class to exit disables interrupt.
 SenvilleAURADisp *lastInst;
-void ISRDispHandler() {
+void IRAM_ATTR ISRDispHandler() {
     if(lastInst) lastInst->handler();
 }
-void ISRSyncHandler() {
+void IRAM_ATTR ISRSyncHandler() {
     if(lastInst) lastInst->handleSynch();
 }
 // return display value as char* of 7bit ascii string
@@ -106,19 +107,21 @@ SenvilleAURADisp::~SenvilleAURADisp() {
     lastInst = 0;
 }
 void SenvilleAURADisp::listen() {
-    noInterrupts();
     //define pin modes
-    pinMode(CLK_HSPI, INPUT);
-    pinMode(DATA_MOSI, INPUT);
     attachInterrupt(digitalPinToInterrupt(CLK_HSPI), ISRDispHandler, RISING);
+    pinMode(CLK_HSPI, INPUT);
     attachInterrupt(digitalPinToInterrupt(LED_INTER), ISRSyncHandler, RISING);
-    interrupts();
+    pinMode(LED_INTER, INPUT);
+    pinMode(DATA_MOSI, INPUT);
+  #ifdef DEBUG
+      Serial.println("SenvilleAURADisp::listen");
+  #endif
 }
 void SenvilleAURADisp::listenStop() {
-    noInterrupts();
+    cli();
     detachInterrupt(digitalPinToInterrupt(CLK_HSPI));
     detachInterrupt(digitalPinToInterrupt(LED_INTER));
-    interrupts();
+    sei();
 }
 bool SenvilleAURADisp::hasUpdate() {
     bool newVal = true;
@@ -163,7 +166,7 @@ char *SenvilleAURADisp::toBuff(char *buf) {
 // Read next bit - flag when full byte ready
 void SenvilleAURADisp::handler() {
     bool bitVal;
-    noInterrupts();
+    cli();
 
     if(!byteReady) {
         // process when gathering byte bits
@@ -177,15 +180,15 @@ void SenvilleAURADisp::handler() {
             byteReady = true;
         }
     }
-    interrupts();
+    sei();
 }
 // Reset to first byte. reset bits for sure alignment
 void SenvilleAURADisp::handleSynch() {
-    noInterrupts();
+    cli();
     displayPtr = 0;
     bitPtr = 0;
 #ifdef DEBUG
     Serial.println("LED Interrupt");
 #endif
-    interrupts();
+    sei();
 }
