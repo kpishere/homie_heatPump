@@ -57,7 +57,7 @@ Sending an instruction to turn on heatpump, set temp, and put in heat mode with 
 
 ## Updates
 
-There is a new target, `sming_headpump`.  [Sming](https://sminghub.github.io)  The other Arduino target examples remain, along with the Homie one but the net result is that Homie 2.0.0 with Arduino Lib v.2.4.2 was not reliable enough to use for HVAC.  Even with the watchdoc timer, after a day or two, it was not reliable.  Future development (from me anyhow) will be tested only with Sming library xtensa build chain.
+There is a new target, `sming_headpump` (see: [Sming](https://sminghub.github.io))  The other Arduino target examples remain, along with the Homie one but the net result is that Homie 2.0.0 with Arduino Lib v.2.4.2 was not reliable enough to use for HVAC.  Even with the watchdog timer, after a day or two, it was not reliable.  Future development (from me anyhow) will be tested only with Sming library and the xtensa build chain.
 
 ## Upcoming
 
