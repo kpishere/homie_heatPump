@@ -22,7 +22,7 @@ This library is independent of Homie, the example merely uses it and you'll have
 
 *New*
 
-A configuration for a generic NEC remote control has been added -- for something completely different from HVAC.  With that, the send/receive pins can be split and are parameterized. 
+A configuration for a generic NEC remote control has been added -- for something completely different from HVAC.  With that, the send/receive pins can be split and are parameterized.
 
 ## Wiring Suggestions
 
@@ -32,7 +32,7 @@ Trust me, with this class of heat pump, there is no serial link here.  I've sear
 
 CN201 --> NodeMcu
 --------------------------
-*  GND  Black --> GND 
+*  GND  Black --> GND
 *  5V   White --> 5V In
 *  IR   Red - IR pulse duration signal --> D1
 *  DATA Orange - DATA for LEDs  --> D7 (DATA_MOSI)
@@ -47,7 +47,7 @@ NOTE and NB! :  ESP8266 is said to be 5V tolerant on sensing and will only drive
 
 For configuring WiFI, create your own config.json file in your working project folder and use the bash script config.sh to upload the settings.  It is more handy and straightforward than the clever (but still awkward) html config page presented in the homie project web pages.
 
-Example: 
+Example:
 
 {"name": "heatpump","wifi": {"ssid": "VeggiePlatter","password": "chicken"},"mqtt": {"host": "192.168.1.199","port": 1883,"auth": false},"ota": {"enabled": true},"device_id": "heatpump"}
 
@@ -55,9 +55,10 @@ Sending an instruction to turn on heatpump, set temp, and put in heat mode with 
 
 ...: mosquitto_pub -h localhost -t homie/heatpump/heatpump/control/set -m "{IsOn:1, Instr:1, Mode:0, FanSpeed:0, SetTemp:22}"
 
+## Updates
+
+There is a new target, `sming_headpump`.  [Sming](https://sminghub.github.io)  The other Arduino target examples remain, along with the Homie one but the net result is that Homie 2.0.0 with Arduino Lib v.2.4.2 was not reliable enough to use for HVAC.  Even with the watchdoc timer, after a day or two, it was not reliable.  Future development (from me anyhow) will be tested only with Sming library xtensa build chain.
+
 ## Upcoming
 
 Will be continuing with monitoring data collection from operation of unit and with validated measurements, adding a property(ies) to the MQTT stream for these values.
-
-## Notes
-- Using Homie 2.0.0 requires Arduino Lib for ESP8266 v.2.4.2 (does not work right with 2.5.X)
