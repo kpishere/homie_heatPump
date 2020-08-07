@@ -2,6 +2,7 @@
 #include "SenvilleAURADisp.hpp"
 #include "IRLink.hpp"
 #include "SenvilleAURA.hpp"
+#include "Data/Stream/FileStream.h"
 //#define DEBUG
 
 // If you want, you can define WiFi settings globally in Eclipse Environment Variables
@@ -23,6 +24,7 @@
 #define MQTT_URL MQTT_URL1
 #endif
 
+#define CONFIG_FILENAME "control.config"
 #define MQTT_DEVICE_NAME "esp8266_01"
 #define MQTT_CONTROL_PATH "hvac/heatpump/control"
 #define MQTT_DISPLAY_PATH "hvac/heatpump/display"
@@ -38,8 +40,8 @@ IRLink *irReceiver;
 SenvilleAURA *senville;
 SenvilleAURADisp *disp;
 uint8_t byteMsgBuf[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
-volatile char *controlBuff;
-volatile char *displayBuff;
+char *controlBuff;
+char *displayBuff;
 unsigned long lastUpdate;
 volatile uint8_t updateFlags = UpdateProperty::None;
 
@@ -72,6 +74,54 @@ void onMessageDelivered(uint16_t msgId, int type)
 {
 	Serial.printf(_F("Message with id %d and QoS %d was delivered successfully."), msgId,
 				  (type == MQTT_MSG_PUBREC ? 2 : 1));
+}
+
+void irSendFromJsonString(String message) {
+  if(senville->fromJsonBuff((char *)message.c_str(), byteMsgBuf)) {
+  #ifdef DEBUG
+    Serial.print("Sending message : 0x");
+    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
+      Serial.printf("%0X ",byteMsgBuf[i]);
+    Serial.println();
+  #endif
+    irReceiver->send(byteMsgBuf,true);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
+    irReceiver->listen();
+    lastUpdate = 0; // will trigger a publish event
+  } else {
+#ifdef DEBUG
+    Serial.printf("\tFailed to parse.\n");
+#endif
+  }
+}
+
+void loadConfig() {
+  FileStream *fileStream = new FileStream();
+  int readBytes = 0;
+  String strVal;
+
+  if(fileStream->open(CONFIG_FILENAME,eFO_ReadOnly)) {
+    readBytes = fileStream->readMemoryBlock(controlBuff,maxBuffLen);
+    if(readBytes>0) {
+      strVal = String((const char *)controlBuff);
+
+      irSendFromJsonString(strVal);
+    }
+    fileStream->close();
+  }
+  delete fileStream;
+}
+
+void saveConfig() {
+  FileStream *fileStream = new FileStream();
+  String strVal;
+
+  if(fileStream->open(CONFIG_FILENAME,eFO_CreateNewAlways)) {
+    senville->toJsonBuff((char *)controlBuff);
+    strVal = String((const char *)controlBuff);
+    fileStream->write((const uint8_t *)strVal.c_str(),strVal.length());
+    fileStream->close();
+  }
+  delete fileStream;
 }
 
 void publish() {
@@ -161,21 +211,8 @@ void onMessageReceived(String topic, String message)
 	Serial.println(message);
 	#endif
 	if(topic == MQTT_CONTROL_PATH) {
-  	if(senville->fromJsonBuff((char *)message.c_str(), byteMsgBuf)) {
-	#ifdef DEBUG
-	    Serial.print("Sending message : 0x");
-	    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
-	      Serial.printf("%0X ",byteMsgBuf[i]);
-	    Serial.println();
-	#endif
-      irReceiver->send(byteMsgBuf,true);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
-      irReceiver->listen();
-			lastUpdate = 0; // will trigger a publish event
-    } else {
-#ifdef DEBUG
-    	Serial.printf("\tFailed to parse.\n");
-#endif
-    }
+    irSendFromJsonString(message);
+    saveConfig();
 	}
 }
 
@@ -243,6 +280,8 @@ void init()
 	lastUpdate = 0;
 	controlBuff = (char *)malloc(sizeof(char) * maxBuffLen);
 	displayBuff = (char *)malloc(sizeof(char) * maxBuffLen);
+
+  loadConfig();
 
 	WifiStation.config(WIFI_SSID, WIFI_PWD);
 	WifiStation.enable(true);
