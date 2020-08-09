@@ -7,7 +7,7 @@
 #define SHOW_RAWDATA
 //#define DEBUG
 
-#define JSON_PARSEBUFFER 100
+#define JSON_PARSEBUFFER 512
 
 // Json command/stat strings
 #define CMD_ISON    "IsOn"
@@ -169,6 +169,17 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
     APND_CHARBUFF(pos,buf,"}%s", "")
     return buf;
 }
+bool SenvilleAURA::fromJsonBuffIsDifferent(char *buf, uint8_t *sendBuf) {
+  uint8_t tmpMsg[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
+  memcpy(tmpMsg, this->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+  this->fromJsonBuff(buf,sendBuf);
+  if(memcmp(tmpMsg,this->getMessage(),MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t)) != 0) { // Different
+    // copy initial values back for no-change effect
+    memcpy(this->getMessage(), tmpMsg, MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+    return true;
+  }
+  return false; // Same
+}
 bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
     bool isOn, slp;
     Mode mde;
@@ -178,13 +189,13 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
     FollowMeState fms;
     Option opt;
     Instruction thisInstr;
-    DynamicJsonDocument root(JSON_PARSEBUFFER);
-    auto error = deserializeJson(root, buf);
+    StaticJsonDocument<JSON_PARSEBUFFER> root;
+    DeserializationError error = deserializeJson(root, buf);
 
     // Test if parsing succeeds.
     if (error) {
       #ifdef DEBUG
-      Serial.print("parseObject() failed with code ");
+      Serial.print("parseObject("); Serial.print(buf); Serial.print(") failed with code ");
       Serial.println(error.c_str());
       #endif
       return false;
@@ -218,6 +229,8 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
                         this->setSetTemp(tmp);
                     }
                     memmove(sendBuf, this->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+                    this->sampleId++;
+                    this->lastSampleMs = millis();
                     return true;
                 } else {
                     if(root.containsKey(CMD_MTMP) && root.containsKey(CMD_STATE)) {
@@ -225,6 +238,8 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
                         fms = static_cast<FollowMeState>(root[CMD_STATE].as<uint8_t>());
                         sFlw = this->followMeCmd(this, fms, mTmp);
                         memmove(sendBuf, sFlw->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+                        this->sampleId++;
+                        this->lastSampleMs = millis();
                         return true;
                     }
                 }
@@ -234,6 +249,8 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
                     opt = static_cast<Option>(root[CMD_OPT].as<uint8_t>());
                     sOpt = this->optionCmd(opt);
                     memmove(sendBuf, sOpt->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+                    this->sampleId++;
+                    this->lastSampleMs = millis();
                     return true;
                 }
                 break;

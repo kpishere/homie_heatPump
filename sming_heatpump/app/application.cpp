@@ -2,7 +2,6 @@
 #include "SenvilleAURADisp.hpp"
 #include "IRLink.hpp"
 #include "SenvilleAURA.hpp"
-#include "Data/Stream/FileStream.h"
 //#define DEBUG
 
 // If you want, you can define WiFi settings globally in Eclipse Environment Variables
@@ -24,6 +23,7 @@
 #define MQTT_URL MQTT_URL1
 #endif
 
+#define DEFAULT_CONFIG "{IsOn:0 , Instr:1 , Mode:0 , FanSpeed:0 , IsSleepOn:0 , SetTemp:22}"
 #define CONFIG_FILENAME "control.config"
 #define MQTT_DEVICE_NAME "esp8266_01"
 #define MQTT_CONTROL_PATH "hvac/heatpump/control"
@@ -36,17 +36,17 @@ typedef enum UpdatePropertyE {
 const int DEFAULT_UPDATE_INTERVAL = 180; // 3 min
 #define WIFI_RESTART_INTERVAL 30 /* seconds */
 
+#define MAX_BUFFLEN 100
+
 IRLink *irReceiver;
 SenvilleAURA *senville;
 SenvilleAURADisp *disp;
 uint8_t byteMsgBuf[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
-char *controlBuff;
-char *displayBuff;
+char controlBuff[MAX_BUFFLEN];
+char displayBuff[MAX_BUFFLEN];
 unsigned long lastUpdate;
 volatile uint8_t updateFlags = UpdateProperty::None;
 
-#define MAX_BUFFLEN 100
-unsigned short maxBuffLen = MAX_BUFFLEN;
 
 // Forward declarations
 void startMqttClient();
@@ -76,15 +76,15 @@ void onMessageDelivered(uint16_t msgId, int type)
 				  (type == MQTT_MSG_PUBREC ? 2 : 1));
 }
 
-void irSendFromJsonString(String message) {
+void irSendFromJsonString(String message, bool doEcho) {
   if(senville->fromJsonBuff((char *)message.c_str(), byteMsgBuf)) {
   #ifdef DEBUG
-    Serial.print("Sending message : 0x");
+    Serial.print(_F("Sending message : 0x"));
     for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
       Serial.printf("%0X ",byteMsgBuf[i]);
     Serial.println();
   #endif
-    irReceiver->send(byteMsgBuf,true);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
+    irReceiver->send(byteMsgBuf,doEcho);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
     irReceiver->listen();
     lastUpdate = 0; // will trigger a publish event
   } else {
@@ -94,34 +94,53 @@ void irSendFromJsonString(String message) {
   }
 }
 
+void saveConfig() {
+  String strVal;
+
+  file_t fd = fileOpen(_F(CONFIG_FILENAME), eFO_CreateNewAlways |  eFO_ReadWrite );
+  #ifdef DEBUG
+  Serial.printf(_F("save fileOpen(\"%s\") = %d\r\n"), _F(CONFIG_FILENAME), fd);
+  #endif
+  if(fd > 0) {
+    senville->toJsonBuff((char *)controlBuff);
+    strVal = String((const char *)controlBuff);
+    #ifdef DEBUG
+        Serial.printf("write: %s\n",strVal.c_str());
+    #endif
+    if (fileWrite(fd, (const void *)strVal.c_str(), strVal.length()) < 0) {
+      #ifdef DEBUG
+      printf("\twrite errno %i\n", fileLastError(fd));
+      #endif
+    }
+    fileClose(fd);
+  }
+}
+
 void loadConfig() {
-  FileStream *fileStream = new FileStream();
   int readBytes = 0;
   String strVal;
 
-  if(fileStream->open(CONFIG_FILENAME,eFO_ReadOnly)) {
-    readBytes = fileStream->readMemoryBlock(controlBuff,maxBuffLen);
-    if(readBytes>0) {
+  file_t fd = fileOpen(_F(CONFIG_FILENAME), eFO_ReadOnly);
+  #ifdef DEBUG
+  Serial.printf(_F("load fileOpen(\"%s\") = %d\r\n"), _F(CONFIG_FILENAME), fd);
+  #endif
+
+	if(fd > 0) {
+    readBytes = fileRead(fd, controlBuff, MAX_BUFFLEN);
+		if(readBytes > 0) {
       strVal = String((const char *)controlBuff);
 
-      irSendFromJsonString(strVal);
-    }
-    fileStream->close();
-  }
-  delete fileStream;
-}
+      #ifdef DEBUG
+          Serial.printf("Loaded: %s\n",controlBuff);
+      #endif
 
-void saveConfig() {
-  FileStream *fileStream = new FileStream();
-  String strVal;
-
-  if(fileStream->open(CONFIG_FILENAME,eFO_CreateNewAlways)) {
-    senville->toJsonBuff((char *)controlBuff);
-    strVal = String((const char *)controlBuff);
-    fileStream->write((const uint8_t *)strVal.c_str(),strVal.length());
-    fileStream->close();
+      irSendFromJsonString(strVal,true);
+		}
+    fileClose(fd);
+  } else {
+    // Set & Save default state
+    irSendFromJsonString(_F(DEFAULT_CONFIG),true);
   }
-  delete fileStream;
 }
 
 void publish() {
@@ -132,7 +151,7 @@ void publish() {
       senville->toJsonBuff((char *)controlBuff);
 
 			strVal = String((const char *)controlBuff);
-			mqtt.publish(F(MQTT_CONTROL_PATH), strVal);
+			mqtt.publish(_F(MQTT_CONTROL_PATH), strVal);
     }
 
     if(updateFlags & UpdateProperty::Display) {
@@ -140,7 +159,7 @@ void publish() {
       disp->toBuff((char *)displayBuff);
 
 			strVal = String((const char *)displayBuff);
-			mqtt.publish(F(MQTT_DISPLAY_PATH), strVal);
+			mqtt.publish(_F(MQTT_DISPLAY_PATH), strVal);
     }
     updateFlags = UpdateProperty::None;
 }
@@ -186,7 +205,7 @@ void scan()
   }
 
   // Update Homie properties
-  if(thisUpdate - lastUpdate >= DEFAULT_UPDATE_INTERVAL * 1000UL || lastUpdate == 0) {
+  if((thisUpdate - lastUpdate) >= (DEFAULT_UPDATE_INTERVAL * 1e3) || lastUpdate == 0) {
     updateFlags = UpdateProperty::All;
   }
 	if(mqtt.getConnectionState() != eTCS_Connected) {
@@ -210,10 +229,14 @@ void onMessageReceived(String topic, String message)
 	Serial.print(": ");
 	Serial.println(message);
 	#endif
-	if(topic == MQTT_CONTROL_PATH) {
-    irSendFromJsonString(message);
-    saveConfig();
-	}
+	if(topic == _F(MQTT_CONTROL_PATH)) {
+    // Only save & send if there is meaningfull change (save on EEPROM writes)
+    String myCopy = message; // jsonParsing is destructive to string, so copy for each parse
+    if(senville->fromJsonBuffIsDifferent((char *)myCopy.c_str(), byteMsgBuf)) {
+      irSendFromJsonString(message, false);
+      saveConfig();
+    }
+  }
 }
 
 // Run MQTT client
@@ -222,7 +245,7 @@ void startMqttClient()
 	procTimer.stop();
 
 	// 1. [Setup]
-	if(!mqtt.setWill(F(MQTT_DISPLAY_PATH), F("{}"))) {
+	if(!mqtt.setWill(_F(MQTT_DISPLAY_PATH), F("{}"))) {
 		debugf("Unable to set the last will and testament. Most probably there is not enough memory on the device.");
 	}
 
@@ -254,8 +277,8 @@ void startMqttClient()
 	Serial.print(_F("Connecting to "));
 	Serial.println(url);
 #endif
-	mqtt.connect(url, F(MQTT_DEVICE_NAME));
-	mqtt.subscribe(F(MQTT_CONTROL_PATH));
+	mqtt.connect(url, _F(MQTT_DEVICE_NAME));
+	mqtt.subscribe(_F(MQTT_CONTROL_PATH));
 }
 
 void onConnected(IpAddress ip, IpAddress netmask, IpAddress gateway)
@@ -264,12 +287,14 @@ void onConnected(IpAddress ip, IpAddress netmask, IpAddress gateway)
 	startMqttClient();
 }
 
-void init()
+void GDB_IRAM_ATTR init()
 {
 #ifdef DEBUG
 	Serial.begin(SERIAL_BAUD_RATE); // 115200 by default
 	Serial.systemDebugOutput(true); // Debug output to serial
 #endif
+  spiffs_mount();
+  delay(3000);
 
 	// Hardware integration
 	disp = new SenvilleAURADisp();
@@ -278,8 +303,6 @@ void init()
 	irReceiver->listen();
 	updateFlags = UpdateProperty::All;
 	lastUpdate = 0;
-	controlBuff = (char *)malloc(sizeof(char) * maxBuffLen);
-	displayBuff = (char *)malloc(sizeof(char) * maxBuffLen);
 
   loadConfig();
 

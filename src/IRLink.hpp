@@ -32,7 +32,7 @@
 #else // defined(ESP8266)
     #define 	ESP_MAX_INTERRUPTS   16
     #define 	digitalPinToInterrupt(p)   ( (p) < ESP_MAX_INTERRUPTS ? (p) : -1 )
-    #define RING_BUFFER_SIZE  550
+    #define RING_BUFFER_SIZE  200
     #define IR_PINR 5 /*GPIO5 - Pin D1*/
     #define IR_PINX 5 /*GPIO5 - Pin D1*/
 #endif

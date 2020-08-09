@@ -111,6 +111,8 @@ public:
     char *toJsonBuff(char *buf);
     // Returns true if successfully parsed and sendBuf is populated for transmission
     bool fromJsonBuff(char *buf, uint8_t *sendBuf);
+    // Returns true if different, false if same as current state
+    bool fromJsonBuffIsDifferent(char *buf, uint8_t *sendBuf);
 
     // Control Options
     Instruction getInstructionType();
