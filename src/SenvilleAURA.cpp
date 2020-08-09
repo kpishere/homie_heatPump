@@ -127,6 +127,10 @@ char *SenvilleAURA::toBuff(char *buf) {
 char *SenvilleAURA::toJsonBuff(char *buf) {
     int pos = 0, i;
     buf[0] = 0x00;
+    // Always use first sample as bytes are inverted in second sample
+    this->getMessage(); // want side effect here
+    this->validSamplePtr = 0;
+
     switch(this->getInstructionType()) {
         case Instruction::Command:
             APND_CHARBUFF(pos,buf,"{" CMD_ISON ":%d ", this->getPowerOn())
@@ -200,6 +204,10 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
       #endif
       return false;
     }
+
+    // Always use first sample as bytes are inverted in second sample
+    this->getMessage(); // want side effect here
+    this->validSamplePtr = 0;
 
     if(root.containsKey(CMD_INSTR)) {
         thisInstr = static_cast<Instruction>(root[CMD_INSTR].as<uint8_t>());
