@@ -53,11 +53,11 @@
 
 #define TEMP_LOWEST 17
 
-enum Instruction {Command = 0x01, InstrOption = 0x02, FollowMe = 0x04};
-enum Mode {Cool = 0 , Dry = 1, ModeAuto = 2, Heat = 3, Fan = 4};
-enum FanSpeed {FanAuto = 0, Low = 1, Med = 2, High = 3};
-enum Option {Direct = 1, Swing = 2, Led = 8, Turbo = 9, SelfClean = 13, SilenceOn = 18, SilenceOff = 19, FP = 15};
-enum FollowMeState {FmStart = 0xFF, FmUpdateTemp = 0x7F, FmStop = 0x3F};
+enum Instruction : uint8_t {Command = 0x01, InstrOption = 0x02, FollowMe = 0x04};
+enum Mode : uint8_t {Cool = 0 , Dry = 1, ModeAuto = 2, Heat = 3, Fan = 4};
+enum FanSpeed : uint8_t {FanAuto = 0, Low = 1, Med = 2, High = 3};
+enum Option : uint8_t {Direct = 1, Swing = 2, Led = 8, Turbo = 9, SelfClean = 13, SilenceOn = 18, SilenceOff = 19, FP = 15};
+enum FollowMeState  : uint8_t {FmStart = 0xFF, FmUpdateTemp = 0x7F, FmStop = 0x3F};
 
 class SenvilleAURA {
     // Sample index is 0 or 1
@@ -111,8 +111,6 @@ public:
     char *toJsonBuff(char *buf);
     // Returns true if successfully parsed and sendBuf is populated for transmission
     bool fromJsonBuff(char *buf, uint8_t *sendBuf);
-    // Returns true if different, false if same as current state
-    bool fromJsonBuffIsDifferent(char *buf, uint8_t *sendBuf);
 
     // Control Options
     Instruction getInstructionType();

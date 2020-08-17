@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "SenvilleAURA.hpp"
 #include <ArduinoJson.h>
-#define SHOW_RAWDATA
+//#define SHOW_RAWDATA
 //#define DEBUG
 
 #define JSON_PARSEBUFFER 512
@@ -173,17 +173,6 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
     APND_CHARBUFF(pos,buf,"}%s", "")
     return buf;
 }
-bool SenvilleAURA::fromJsonBuffIsDifferent(char *buf, uint8_t *sendBuf) {
-  uint8_t tmpMsg[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
-  memcpy(tmpMsg, this->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
-  this->fromJsonBuff(buf,sendBuf);
-  if(memcmp(tmpMsg,this->getMessage(),MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t)) != 0) { // Different
-    // copy initial values back for no-change effect
-    memcpy(this->getMessage(), tmpMsg, MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
-    return true;
-  }
-  return false; // Same
-}
 bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
     bool isOn, slp;
     Mode mde;
@@ -252,13 +241,14 @@ bool SenvilleAURA::fromJsonBuff(char *buf, uint8_t *sendBuf) {
                     }
                 }
                 break;
-            default: // An InstrOption
+            default: // An InstrOption - NOTE: optionCmd() creates new instance to not effect buffer values
                 if(root.containsKey(CMD_OPT)) {
                     opt = static_cast<Option>(root[CMD_OPT].as<uint8_t>());
                     sOpt = this->optionCmd(opt);
                     memmove(sendBuf, sOpt->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
                     this->sampleId++;
                     this->lastSampleMs = millis();
+                    delete sOpt;
                     return true;
                 }
                 break;
@@ -311,8 +301,12 @@ void SenvilleAURA::setSleepOn(bool newState) {
            | 0x40 : message[MSG_CMD_OPT(this->validSamplePtr)] & 0xBF );
 }
 Option SenvilleAURA::getOption() {
-    return static_cast<Option>(message[MSG_CMD_OPT(this->validSamplePtr)] & 0x1F);
+    Serial.print(" raw getOption(");
+    Serial.print(message[MSG_CMD_OPT(this->validSamplePtr)] & 0x1F, HEX);
+    Serial.print(")");
+    return static_cast<Option>( message[MSG_CMD_OPT(this->validSamplePtr)] & 0x1F );
 }
+// NB: returned pointer must be deleted by caller
 SenvilleAURA *SenvilleAURA::optionCmd(Option val) {
     SenvilleAURA *obj = new SenvilleAURA();
     uint8_t *msg = obj->getMessage();

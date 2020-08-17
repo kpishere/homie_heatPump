@@ -6,7 +6,7 @@
 //
 
 #include "SenvilleAURADisp.hpp"
-//#define DEBUG
+#define DEBUG
 
 #if defined(__AVR__)
 #else // defined(ESP8266)
@@ -30,12 +30,10 @@
 // Bit/Byte management
 volatile short SenvilleAURADisp::bitPtr;
 volatile uint8_t SenvilleAURADisp::rdByte;
-volatile bool SenvilleAURADisp::byteReady;
 
 // Message values
 volatile uint8_t SenvilleAURADisp::displayBuff[DISPLAY_BYTE_SIZE];
 volatile uint8_t SenvilleAURADisp::displayBuffLast[DISPLAY_BYTE_SIZE];
-volatile bool SenvilleAURADisp::printIt;
 volatile uint8_t SenvilleAURADisp::displayPtr;
 
 const DisplayMapAscii SenvilleAURADisp::displayMap[] = {
@@ -96,11 +94,15 @@ const char *displayBytetoAscii(uint8_t b) {
 //////
 SenvilleAURADisp::SenvilleAURADisp() {
     lastInst = this;
-    printIt = false;
     displayPtr = 0;
     bitPtr = 0;
     rdByte = 0;
-    byteReady = false;
+    pinMode(CLK_HSPI, INPUT);
+    pinMode(LED_INTER, INPUT);
+    pinMode(DATA_MOSI, INPUT);
+    #ifdef DEBUG
+    pinMode(DEBUG_PIN, OUTPUT);
+    #endif
     this->listen();
 }
 SenvilleAURADisp::~SenvilleAURADisp() {
@@ -109,45 +111,33 @@ SenvilleAURADisp::~SenvilleAURADisp() {
 void SenvilleAURADisp::listen() {
     //define pin modes
     attachInterrupt(digitalPinToInterrupt(CLK_HSPI), ISRDispHandler, RISING);
-    pinMode(CLK_HSPI, INPUT);
     attachInterrupt(digitalPinToInterrupt(LED_INTER), ISRSyncHandler, RISING);
-    pinMode(LED_INTER, INPUT);
-    pinMode(DATA_MOSI, INPUT);
-  #ifdef DEBUG
-      Serial.println("SenvilleAURADisp::listen");
-  #endif
+    displayPtr = 0;
+    #ifdef DEBUG
+    digitalWrite(DEBUG_PIN,HIGH);
+    #endif
 }
 void SenvilleAURADisp::listenStop() {
-    cli();
     detachInterrupt(digitalPinToInterrupt(CLK_HSPI));
     detachInterrupt(digitalPinToInterrupt(LED_INTER));
-    sei();
+    #ifdef DEBUG
+    digitalWrite(DEBUG_PIN,LOW);
+    #endif
 }
 bool SenvilleAURADisp::hasUpdate() {
     bool newVal = true;
     uint8_t spaces = 0;
-    // Collects bytes until display array is filled
-    if(byteReady) {
-        byteReady = false;
-        bitPtr = 0;
-        displayBuff[displayPtr % DISPLAY_BYTE_SIZE] = rdByte & DISPLAY_MASK;
-        displayPtr++;
-        if(displayPtr % DISPLAY_BYTE_SIZE == 0) {
-            printIt = true;
-        }
+    if( displayPtr >= DISPLAY_BYTE_SIZE ) {
+      // Test all display bytes for a change
+      for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
+          newVal = newVal && displayBuff[i] == displayBuffLast[i];
+          displayBuffLast[i] = displayBuff[i];
+          // Supress results with spaces -- due to flashing
+          if(i < DISP_LEDS)
+              spaces += (displayBuff[i] == DISPLAY_MASK ? 1 : 0);
+      }
+      if(spaces>0) return false;
     }
-    if(!printIt)    return false;
-    else            printIt = false;
-    // Test all display bytes for a change
-    for(int i=0; i< DISPLAY_BYTE_SIZE; i++) {
-        newVal = newVal && displayBuff[i] == displayBuffLast[i];
-        displayBuffLast[i] = displayBuff[i];
-        // Supress results with spaces -- due to flashing
-        if(i < DISP_LEDS)
-            spaces += (displayBuff[i] == DISPLAY_MASK ? 1 : 0);
-    }
-    if(spaces>0) return false;
-    if(!newVal) this->listenStop();
     return !newVal;
 }
 #define APND_CHARBUFF(pos,buf,arg0,arg1) (pos) = strlen(buf); sprintf(&(buf)[(pos)],arg0,arg1);
@@ -168,17 +158,20 @@ void SenvilleAURADisp::handler() {
     bool bitVal;
     cli();
 
-    if(!byteReady) {
-        // process when gathering byte bits
-        bitVal = digitalRead(DATA_MOSI);
-        if(bitPtr==0) {
-            rdByte = 0;
-        }
-        rdByte |= (bitVal << (bitPtr%BITSINBYTE));
-        bitPtr++;
-        if(bitPtr == BITSINBYTE) {
-            byteReady = true;
-        }
+    // process when gathering byte bits
+    bitVal = digitalRead(DATA_MOSI);
+    if(bitPtr==0) {
+        rdByte = 0;
+    }
+    rdByte |= (bitVal << (bitPtr%BITSINBYTE));
+    bitPtr++;
+    if(bitPtr == BITSINBYTE) {
+      bitPtr = 0;
+      displayBuff[displayPtr % DISPLAY_BYTE_SIZE] = rdByte & DISPLAY_MASK;
+      displayPtr++;
+      if(displayPtr % DISPLAY_BYTE_SIZE == 0) {
+        this->listenStop(); // end when we've got 3 bytes
+      }
     }
     sei();
 }
@@ -187,8 +180,9 @@ void SenvilleAURADisp::handleSynch() {
     cli();
     displayPtr = 0;
     bitPtr = 0;
-#ifdef DEBUG
-    Serial.println("LED Interrupt");
-#endif
+    #ifdef DEBUG
+    digitalWrite(DEBUG_PIN,!digitalRead(DEBUG_PIN));
+    digitalWrite(DEBUG_PIN,!digitalRead(DEBUG_PIN));
+    #endif
     sei();
 }

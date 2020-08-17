@@ -97,7 +97,10 @@ void ICACHE_RAM_ATTR onTimer1ISR(void *argptr){
                             ,IRLink::config->msgBreakLength.val)) {
         // disable timer compare interrupt
         hw_timer1_disable();
-        pinMode(IRLink::pinX,INPUT);
+        if(IRLink::pinX == IRLink::pinR) {
+          pinMode(IRLink::pinX,INPUT);
+          digitalWrite(IRLink::pinX,HIGH); // want to ensure we remain in this state as default`
+        }
     }
     sei();
 }
@@ -132,7 +135,9 @@ void configSend() {
         TIMSK1 &= ~_BV(OCIE1A);
 #else // defined(ESP8266)
     hw_timer_init();
-    pinMode(IRLink::pinX,OUTPUT);
+    if(IRLink::pinX == IRLink::pinR) {
+      pinMode(IRLink::pinX,OUTPUT);
+    }
     digitalWrite(IRLink::pinX,HIGH);
 #endif
     sei();//allow interrupts

@@ -27,6 +27,7 @@
 #define CONFIG_FILENAME "control.config"
 #define MQTT_DEVICE_NAME "esp8266_01"
 #define MQTT_CONTROL_PATH "hvac/heatpump/control"
+#define MQTT_STATUS_PATH "hvac/heatpump/status"
 #define MQTT_DISPLAY_PATH "hvac/heatpump/display"
 
 typedef enum UpdatePropertyE {
@@ -35,6 +36,7 @@ typedef enum UpdatePropertyE {
 
 const int DEFAULT_UPDATE_INTERVAL = 180; // 3 min
 #define WIFI_RESTART_INTERVAL 30 /* seconds */
+#define DISPLAY_IR_SCAN_INTERVAL 200 /* 1e-3 seconds */
 
 #define MAX_BUFFLEN 100
 
@@ -46,7 +48,7 @@ char controlBuff[MAX_BUFFLEN];
 char displayBuff[MAX_BUFFLEN];
 unsigned long lastUpdate;
 volatile uint8_t updateFlags = UpdateProperty::None;
-
+boolean ready = false;
 
 // Forward declarations
 void startMqttClient();
@@ -66,6 +68,8 @@ void checkMQTTDisconnect(TcpClient& client, bool flag)
 		Serial.println(_F("MQTT Broker Unreachable."));
 	}
 #endif
+  ready = false;
+  disp->listenStop();
 	// Restart connection attempt after few seconds
 	procTimer.initializeMs(WIFI_RESTART_INTERVAL * 1000, startMqttClient).start(); // 1e-3 seconds
 }
@@ -76,25 +80,19 @@ void onMessageDelivered(uint16_t msgId, int type)
 				  (type == MQTT_MSG_PUBREC ? 2 : 1));
 }
 
-void irSendFromJsonString(String message, bool doEcho) {
-  if(senville->fromJsonBuff((char *)message.c_str(), byteMsgBuf)) {
+void irSendFromMsgBuffer(uint8_t *msgBuffer) {
   #ifdef DEBUG
-    Serial.print(_F("Sending message : 0x"));
-    for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
-      Serial.printf("%0X ",byteMsgBuf[i]);
-    Serial.println();
+  Serial.print(_F("Sending message : 0x"));
+  for(int i=0; i<MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) ; i++)
+    Serial.printf("%0X ",msgBuffer[i]);
+  Serial.println();
   #endif
-    irReceiver->send(byteMsgBuf,doEcho);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
-    irReceiver->listen();
-    lastUpdate = 0; // will trigger a publish event
-  } else {
-#ifdef DEBUG
-    Serial.printf("\tFailed to parse.\n");
-#endif
-  }
+  irReceiver->send(msgBuffer,true);  // NOWait=true will cause 'echo' which is desired here, it gets written back to MQTT
+  irReceiver->listen();
+  lastUpdate = 0; // will trigger a publish event
 }
 
-void saveConfig() {
+void saveConfig(uint8_t *msgBuffer) {
   String strVal;
 
   file_t fd = fileOpen(_F(CONFIG_FILENAME), eFO_CreateNewAlways |  eFO_ReadWrite );
@@ -102,15 +100,17 @@ void saveConfig() {
   Serial.printf(_F("save fileOpen(\"%s\") = %d\r\n"), _F(CONFIG_FILENAME), fd);
   #endif
   if(fd > 0) {
-    senville->toJsonBuff((char *)controlBuff);
-    strVal = String((const char *)controlBuff);
-    #ifdef DEBUG
-        Serial.printf("write: %s\n",strVal.c_str());
-    #endif
-    if (fileWrite(fd, (const void *)strVal.c_str(), strVal.length()) < 0) {
+    if(senville->isValid(msgBuffer)) {
+      senville->toJsonBuff((char *)controlBuff);
+      strVal = String((const char *)controlBuff);
       #ifdef DEBUG
-      printf("\twrite errno %i\n", fileLastError(fd));
+          Serial.printf("write: %s\n",strVal.c_str());
       #endif
+      if (fileWrite(fd, (const void *)strVal.c_str(), strVal.length()) < 0) {
+        #ifdef DEBUG
+        printf("\twrite errno %i\n", fileLastError(fd));
+        #endif
+      }
     }
     fileClose(fd);
   }
@@ -134,12 +134,14 @@ void loadConfig() {
           Serial.printf("Loaded: %s\n",controlBuff);
       #endif
 
-      irSendFromJsonString(strVal,true);
+      senville->fromJsonBuff((char *)strVal.c_str(), byteMsgBuf);
+      irSendFromMsgBuffer(byteMsgBuf);
 		}
     fileClose(fd);
   } else {
     // Set & Save default state
-    irSendFromJsonString(_F(DEFAULT_CONFIG),true);
+    senville->fromJsonBuff(_F(DEFAULT_CONFIG), byteMsgBuf);
+    irSendFromMsgBuffer(byteMsgBuf);
   }
 }
 
@@ -147,11 +149,14 @@ void publish() {
     String strVal;
 
     if(updateFlags & UpdateProperty::UpdateControl) {
-      // Always get update to get sample time
-      senville->toJsonBuff((char *)controlBuff);
+      // Dont want to put forward option commands, they'll shot up in the control property
+      if( senville->getInstructionType() != Instruction::InstrOption ) {
+        // Always get update to get sample time
+        senville->toJsonBuff((char *)controlBuff);
 
-			strVal = String((const char *)controlBuff);
-			mqtt.publish(_F(MQTT_CONTROL_PATH), strVal);
+  			strVal = String((const char *)controlBuff);
+  			mqtt.publish(_F(MQTT_STATUS_PATH), strVal);
+      }
     }
 
     if(updateFlags & UpdateProperty::Display) {
@@ -173,11 +178,11 @@ void scan()
   // Check display hardware
   if(disp->hasUpdate()) {
 #ifdef DEBUG
+    Serial.print("scan ");
     disp->toBuff((char *)displayBuff);
     Serial.println((const char *)displayBuff);
 #endif
     updateFlags |= UpdateProperty::Display;
-    disp->listen();
   }
 
   // Check IR Link hardware
@@ -219,6 +224,8 @@ void scan()
 		publish();
     lastUpdate = thisUpdate;
   }
+
+  disp->listen();
 }
 
 // Callback for messages, arrived from MQTT server
@@ -230,12 +237,16 @@ void onMessageReceived(String topic, String message)
 	Serial.println(message);
 	#endif
 	if(topic == _F(MQTT_CONTROL_PATH)) {
-    // Only save & send if there is meaningfull change (save on EEPROM writes)
-    String myCopy = message; // jsonParsing is destructive to string, so copy for each parse
-    if(senville->fromJsonBuffIsDifferent((char *)myCopy.c_str(), byteMsgBuf)) {
-      irSendFromJsonString(message, false);
-      saveConfig();
+    uint8_t currentMessage[MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS)];
+    memcpy(currentMessage, senville->getMessage(), MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t));
+    senville->fromJsonBuff((char *)message.c_str(), byteMsgBuf);
+    if( senville->getInstructionType() == Instruction::Command ) {
+      if(memcmp(currentMessage,byteMsgBuf,MSGSIZE_BYTES(MESSAGE_SAMPLES,MESSAGE_BITS) * sizeof(uint8_t)) != 0) {
+        saveConfig(byteMsgBuf);
+      } // Different
     }
+    // Always want to transmit these messages
+    irSendFromMsgBuffer(byteMsgBuf);
   }
 }
 
@@ -254,9 +265,10 @@ void startMqttClient()
 		Serial.print(_F("Connected to "));
 		Serial.println(client.getRemoteIp());
 #endif
-		scan();
-		// Start publishing loop
-		procTimer.initializeMs(1000, scan).start(); // 1e-3 seconds
+    ready = true;
+    // Start publishing loop
+    procTimer.initializeMs(DISPLAY_IR_SCAN_INTERVAL, scan).start();
+
 		return 0;
 	});
 

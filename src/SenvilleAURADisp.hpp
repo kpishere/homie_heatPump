@@ -89,8 +89,9 @@
 
 #define DISPLAY_BYTE_SIZE 3
 #define LED_INTER 4 /* GPIO4 - Pin D2 */
-#define CLK_HSPI 14  /* GPIO14 - Pin D5 */
 #define DATA_MOSI 13  /* GPIO13 - Pin D7 */
+#define CLK_HSPI 14  /* GPIO14 - Pin D5 */
+#define DEBUG_PIN 15 /* GPIO15 - Pin D8 */
 
 #define DISP_MAXSTRINGPERCODE 3
 typedef struct displyMapAsciiS {
@@ -106,11 +107,9 @@ class SenvilleAURADisp {
 private:
     static volatile short bitPtr;
     static volatile uint8_t rdByte;
-    static volatile bool byteReady;
     static volatile uint8_t displayPtr;
     static volatile uint8_t displayBuff[DISPLAY_BYTE_SIZE];
     static volatile uint8_t displayBuffLast[DISPLAY_BYTE_SIZE];
-    static volatile bool printIt;
 public:
     static const DisplayMapAscii displayMap[];
 
