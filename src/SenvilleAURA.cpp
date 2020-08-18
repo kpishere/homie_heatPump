@@ -301,9 +301,11 @@ void SenvilleAURA::setSleepOn(bool newState) {
            | 0x40 : message[MSG_CMD_OPT(this->validSamplePtr)] & 0xBF );
 }
 Option SenvilleAURA::getOption() {
+  #ifdef DEBUG
     Serial.print(" raw getOption(");
     Serial.print(message[MSG_CMD_OPT(this->validSamplePtr)] & 0x1F, HEX);
     Serial.print(")");
+  #endif
     return static_cast<Option>( message[MSG_CMD_OPT(this->validSamplePtr)] & 0x1F );
 }
 // NB: returned pointer must be deleted by caller

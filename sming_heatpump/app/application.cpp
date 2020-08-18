@@ -149,7 +149,7 @@ void publish() {
     String strVal;
 
     if(updateFlags & UpdateProperty::UpdateControl) {
-      // Dont want to put forward option commands, they'll shot up in the control property
+      // Dont want to put forward option commands, they'll show up in the control property
       if( senville->getInstructionType() != Instruction::InstrOption ) {
         // Always get update to get sample time
         senville->toJsonBuff((char *)controlBuff);
