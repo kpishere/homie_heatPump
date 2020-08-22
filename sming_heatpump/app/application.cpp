@@ -28,6 +28,7 @@
 #define MQTT_DEVICE_NAME "esp8266_01"
 #define MQTT_CONTROL_PATH "hvac/heatpump/control"
 #define MQTT_STATUS_PATH "hvac/heatpump/status"
+#define MQTT_PROPERTIES_PATH "hvac/heatpump/properties"
 #define MQTT_DISPLAY_PATH "hvac/heatpump/display"
 
 typedef enum UpdatePropertyE {
@@ -35,10 +36,11 @@ typedef enum UpdatePropertyE {
 } UpdateProperty;
 
 const int DEFAULT_UPDATE_INTERVAL = 180; // 3 min
+#define PROPERTY_SCAN_AT_TIME 60 /* seconds */
 #define WIFI_RESTART_INTERVAL 30 /* seconds */
 #define DISPLAY_IR_SCAN_INTERVAL 200 /* 1e-3 seconds */
 
-#define MAX_BUFFLEN 100
+#define MAX_BUFFLEN 200
 
 IRLink *irReceiver;
 SenvilleAURA *senville;
@@ -49,6 +51,59 @@ char displayBuff[MAX_BUFFLEN];
 unsigned long lastUpdate;
 volatile uint8_t updateFlags = UpdateProperty::None;
 boolean ready = false;
+
+DEFINE_FSTR_LOCAL(PropertyLabels,
+  "T1"
+  "T2"
+  "T3"
+  "T4"
+  "Tb"
+  "TP"
+  "TH"
+  "FT"
+  "Fr"
+  "IF"
+  "0F"
+  "LA"
+  "CT"
+  "5T"
+  "A0"
+  "A1"
+  "b0"
+  "b1"
+  "b2"
+  "b3"
+  "b4"
+  "b5"
+  "b6"
+  "dL"
+  "Ac"
+  "Uo"
+  "Td"
+);
+uint8_t capturePropertyIndex;
+uint8_t initiatePropertyCapture;
+#define DISP_PROPERTIES 27
+#define PROPERTY_MODE_COMMANDS 6
+#define OPTION_CMD "{Instr:2, Opt:%d}"
+typedef struct PropertiesS {
+  char  key[DISP_MAXSTRINGPERCODE];
+  int   value;
+  PropertiesS() { /* init empty */ key[0] = 0x00 ; value = 0; }
+  PropertiesS(char *name, char *valueCode) {
+    memcpy(key,name, (strlen(name) < DISP_MAXSTRINGPERCODE * sizeof(char)
+      ? strlen(name)+1 : DISP_MAXSTRINGPERCODE * sizeof(char) ));
+    value = SenvilleAURADisp::alphaToInt(valueCode);
+    // RPM Properties
+    if(strcmp(name,_F("1F"))==0 || strcmp(name,_F("0F"))==0) {
+      value = value * 10;
+    }
+    if(strcmp(name,_F("LA"))==0) {
+      value = value * 2;
+    }
+  };
+} Properties;
+Properties properties[DISP_PROPERTIES];
 
 // Forward declarations
 void startMqttClient();
@@ -157,6 +212,14 @@ void publish() {
   			strVal = String((const char *)controlBuff);
   			mqtt.publish(_F(MQTT_STATUS_PATH), strVal);
       }
+      // Publish values at same time
+      sprintf(displayBuff,"{");
+      for(int i = 0; i<DISP_PROPERTIES; i++ ) {
+        int pos = strlen(displayBuff);
+        sprintf(&(displayBuff)[(pos)],"%s:%d%s",(char *)properties[i].key,properties[i].value,( (i < DISP_PROPERTIES-1)?", ":"}"));
+      }
+      strVal = String((const char *)displayBuff);
+      mqtt.publish(_F(MQTT_PROPERTIES_PATH), strVal);
     }
 
     if(updateFlags & UpdateProperty::Display) {
@@ -182,6 +245,26 @@ void scan()
     disp->toBuff((char *)displayBuff);
     Serial.println((const char *)displayBuff);
 #endif
+    if(initiatePropertyCapture == 0 && capturePropertyIndex > 0) {
+      disp->asciiDisplay((char *)displayBuff);
+      if(strcmp(displayBuff, String(PropertyLabels[capturePropertyIndex]).c_str()) == 0) {
+        // Validate expected label
+        properties[capturePropertyIndex] = PropertiesS(displayBuff,0);
+      } else {
+        // If not expected label, it is value (if not spaces), set it and increment to next property
+        if(strcmp(displayBuff, _F("  ")) != 0) {
+          properties[capturePropertyIndex] = PropertiesS((char *)String(PropertyLabels[capturePropertyIndex]).c_str()
+            , displayBuff );
+          capturePropertyIndex++;
+          // Send command to increment to next
+          sprintf(controlBuff,OPTION_CMD,Option::Led);
+          senville->fromJsonBuff(controlBuff, byteMsgBuf);
+          irSendFromMsgBuffer(byteMsgBuf);
+        }
+      }
+      // End capture cycle condition
+      if(capturePropertyIndex >= DISP_PROPERTIES ) capturePropertyIndex = 0;
+    }
     updateFlags |= UpdateProperty::Display;
   }
 
@@ -213,6 +296,24 @@ void scan()
   if((thisUpdate - lastUpdate) >= (DEFAULT_UPDATE_INTERVAL * 1e3) || lastUpdate == 0) {
     updateFlags = UpdateProperty::All;
   }
+  // Initiate property capture cycle
+  if( capturePropertyIndex == 0
+    && ( (thisUpdate - lastUpdate) >= (PROPERTY_SCAN_AT_TIME * 1e3) || lastUpdate == 0 )) {
+    capturePropertyIndex++;
+    initiatePropertyCapture = PROPERTY_MODE_COMMANDS;
+  }
+  // Send command and advance to completion of sequence in each scan cycle
+  switch(initiatePropertyCapture) {
+    case 6: case 5: case 4:      sprintf(controlBuff,OPTION_CMD,Option::Led);      break;
+    case 3: case 2: case 1:      sprintf(controlBuff,OPTION_CMD,Option::Direct);   break;
+    default: break; // do nothing
+  }
+  if(initiatePropertyCapture > 0) {
+    senville->fromJsonBuff(controlBuff, byteMsgBuf);
+    irSendFromMsgBuffer(byteMsgBuf);
+    initiatePropertyCapture--;
+  }
+  // Re-connect if needed and publish to MQTT
 	if(mqtt.getConnectionState() != eTCS_Connected) {
 		startMqttClient(); // Auto reconnect
 	}
@@ -266,6 +367,9 @@ void startMqttClient()
 		Serial.println(client.getRemoteIp());
 #endif
     ready = true;
+    capturePropertyIndex = 0;
+    initiatePropertyCapture = 0;
+
     // Start publishing loop
     procTimer.initializeMs(DISPLAY_IR_SCAN_INTERVAL, scan).start();
 
