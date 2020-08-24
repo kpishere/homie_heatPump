@@ -2,7 +2,7 @@
 #include "SenvilleAURADisp.hpp"
 #include "IRLink.hpp"
 #include "SenvilleAURA.hpp"
-//#define DEBUG
+#define DEBUG
 
 // If you want, you can define WiFi settings globally in Eclipse Environment Variables
 #ifndef WIFI_SSID
@@ -40,7 +40,7 @@ const int DEFAULT_UPDATE_INTERVAL = 180; // 3 min
 #define WIFI_RESTART_INTERVAL 30 /* seconds */
 #define DISPLAY_IR_SCAN_INTERVAL 200 /* 1e-3 seconds */
 
-#define MAX_BUFFLEN 200
+#define MAX_BUFFLEN 300
 
 IRLink *irReceiver;
 SenvilleAURA *senville;
@@ -52,57 +52,12 @@ unsigned long lastUpdate;
 volatile uint8_t updateFlags = UpdateProperty::None;
 boolean ready = false;
 
-DEFINE_FSTR_LOCAL(PropertyLabels,
-  "T1"
-  "T2"
-  "T3"
-  "T4"
-  "Tb"
-  "TP"
-  "TH"
-  "FT"
-  "Fr"
-  "IF"
-  "0F"
-  "LA"
-  "CT"
-  "5T"
-  "A0"
-  "A1"
-  "b0"
-  "b1"
-  "b2"
-  "b3"
-  "b4"
-  "b5"
-  "b6"
-  "dL"
-  "Ac"
-  "Uo"
-  "Td"
-);
+CStringArray PropertyLabels;
 uint8_t capturePropertyIndex;
 uint8_t initiatePropertyCapture;
-#define DISP_PROPERTIES 27
+unsigned long timeOfLabelCapture;
 #define PROPERTY_MODE_COMMANDS 6
 #define OPTION_CMD "{Instr:2, Opt:%d}"
-typedef struct PropertiesS {
-  char  key[DISP_MAXSTRINGPERCODE];
-  int   value;
-  PropertiesS() { /* init empty */ key[0] = 0x00 ; value = 0; }
-  PropertiesS(char *name, char *valueCode) {
-    memcpy(key,name, (strlen(name) < DISP_MAXSTRINGPERCODE * sizeof(char)
-      ? strlen(name)+1 : DISP_MAXSTRINGPERCODE * sizeof(char) ));
-    value = SenvilleAURADisp::alphaToInt(valueCode);
-    // RPM Properties
-    if(strcmp(name,_F("1F"))==0 || strcmp(name,_F("0F"))==0) {
-      value = value * 10;
-    }
-    if(strcmp(name,_F("LA"))==0) {
-      value = value * 2;
-    }
-  };
-} Properties;
 Properties properties[DISP_PROPERTIES];
 
 // Forward declarations
@@ -213,13 +168,19 @@ void publish() {
   			mqtt.publish(_F(MQTT_STATUS_PATH), strVal);
       }
       // Publish values at same time
-      sprintf(displayBuff,"{");
-      for(int i = 0; i<DISP_PROPERTIES; i++ ) {
+      if( capturePropertyIndex == 0 ) { // Publish only when not scanning
+        sprintf(displayBuff,"{");
+        for(int i = 0; i<DISP_PROPERTIES; i++ ) {
+          int pos = strlen(displayBuff);
+          if( String((char *)properties[i].key).length()>0) {
+            sprintf(&(displayBuff)[(pos)],"%s:%d%s",(char *)properties[i].key,properties[i].value,( (i < DISP_PROPERTIES-1)?", ":""));
+          }
+        }
         int pos = strlen(displayBuff);
-        sprintf(&(displayBuff)[(pos)],"%s:%d%s",(char *)properties[i].key,properties[i].value,( (i < DISP_PROPERTIES-1)?", ":"}"));
+        sprintf(&(displayBuff)[(pos)],"}");
+        strVal = String((const char *)displayBuff);
+        mqtt.publish(_F(MQTT_PROPERTIES_PATH), strVal);
       }
-      strVal = String((const char *)displayBuff);
-      mqtt.publish(_F(MQTT_PROPERTIES_PATH), strVal);
     }
 
     if(updateFlags & UpdateProperty::Display) {
@@ -250,16 +211,20 @@ void scan()
       if(strcmp(displayBuff, String(PropertyLabels[capturePropertyIndex]).c_str()) == 0) {
         // Validate expected label
         properties[capturePropertyIndex] = PropertiesS(displayBuff,0);
+        timeOfLabelCapture = millis();
       } else {
-        // If not expected label, it is value (if not spaces), set it and increment to next property
-        if(strcmp(displayBuff, _F("  ")) != 0) {
-          properties[capturePropertyIndex] = PropertiesS((char *)String(PropertyLabels[capturePropertyIndex]).c_str()
-            , displayBuff );
-          capturePropertyIndex++;
-          // Send command to increment to next
-          sprintf(controlBuff,OPTION_CMD,Option::Led);
-          senville->fromJsonBuff(controlBuff, byteMsgBuf);
-          irSendFromMsgBuffer(byteMsgBuf);
+        // Wait some time before reading value
+        if( (millis() - timeOfLabelCapture) > DISPLAY_IR_SCAN_INTERVAL * 2 ) {
+          // If not expected label, it is value (if not spaces), set it and increment to next property
+          if(strcmp(displayBuff, _F("  ")) != 0) {
+            properties[capturePropertyIndex] = PropertiesS((char *)String(PropertyLabels[capturePropertyIndex]).c_str()
+              , displayBuff );
+            capturePropertyIndex++;
+            // Send command to increment to next
+            sprintf(controlBuff,OPTION_CMD,Option::Led);
+            senville->fromJsonBuff(controlBuff, byteMsgBuf);
+            irSendFromMsgBuffer(byteMsgBuf);
+          }
         }
       }
       // End capture cycle condition
@@ -405,6 +370,8 @@ void onConnected(IpAddress ip, IpAddress netmask, IpAddress gateway)
 
 void GDB_IRAM_ATTR init()
 {
+  // Valid property labels of HeatPump display
+  PropertyLabels = SENVILLEAURA_PROPERTY_LABELS;
 #ifdef DEBUG
 	Serial.begin(SERIAL_BAUD_RATE); // 115200 by default
 	Serial.systemDebugOutput(true); // Debug output to serial

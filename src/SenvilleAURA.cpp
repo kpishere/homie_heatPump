@@ -140,7 +140,6 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
             APND_CHARBUFF(pos,buf,", " CMD_SLP ":%d ", this->getSleepOn())
             APND_CHARBUFF(pos,buf,", " CMD_STMP ":%d ", this->getSetTemp())
             APND_CHARBUFF(pos,buf,", " STAT_SMPLID ":%ld ", this->getSeqId())
-            APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld ", this->getOnTimeMs())
             break;
         case Instruction::FollowMe:
             APND_CHARBUFF(pos,buf,"{" CMD_ISON ":%d ", this->getPowerOn())
@@ -151,7 +150,6 @@ char *SenvilleAURA::toJsonBuff(char *buf) {
             APND_CHARBUFF(pos,buf,", " CMD_MTMP ":%d ", this->getFollowMeTemp())
             APND_CHARBUFF(pos,buf,", " CMD_STATE ":%d ", this->getFollowMeState())
             APND_CHARBUFF(pos,buf,", " STAT_SMPLID ":%ld ", this->getSeqId())
-            APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld ", this->getOnTimeMs())
             break;
         case Instruction::InstrOption:
             APND_CHARBUFF(pos,buf,"{" CMD_INSTR ":%d ", this->getInstructionType())

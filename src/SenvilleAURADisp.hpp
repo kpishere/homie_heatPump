@@ -54,7 +54,7 @@
  *    Fr - Actual Frequency Compressor (Example: 26, Range: 00-F9, Meaning 0-159 Hz )
  * -- Meaning of values below : 00 - Off, Range: 1-low, 2-med, 3-high, 4-turbo (for non-inverter models?)
  * -- Meaning of values below : 00 - Off, Range: 14-FF hex value of RPM/10 (mult. by 10 for RPM) (for inverter models)
- *    1F - (IF) Indoor fan speed (Example: 40, Meaning 400 RPM)
+ *    IF - (IF) Indoor fan speed (Example: 40, Meaning 400 RPM)
  *    0F - (OF) Outdoor fan speed (Example: 55, Meaning 550 RPM)
  * -- Meaning of values below : Range: 00-B3 hex value of angle in 2 deg. increments (mult. by 2 for degrees)
  *    LA - TXV Opening angle (Example: 96, Meaning: 300 degrees)
@@ -93,6 +93,35 @@
 #define CLK_HSPI 14  /* GPIO14 - Pin D5 */
 #define DEBUG_PIN 15 /* GPIO15 - Pin D8 */
 
+#define SENVILLEAURA_PROPERTY_LABELS F(\
+  "T1\0"\
+  "T2\0"\
+  "T3\0"\
+  "T4\0"\
+  "Tb\0"\
+  "TP\0"\
+  "TH\0"\
+  "FT\0"\
+  "Fr\0"\
+  "IF\0"\
+  "0F\0"\
+  "LA\0"\
+  "CT\0"\
+  "5T\0"\
+  "A0\0"\
+  "A1\0"\
+  "b0\0"\
+  "b1\0"\
+  "b2\0"\
+  "b3\0"\
+  "b4\0"\
+  "b5\0"\
+  "b6\0"\
+  "dL\0"\
+  "Ac\0"\
+  "Uo\0"\
+  "Td")
+
 #define DISP_MAXSTRINGPERCODE 3
 typedef struct displyMapAsciiS {
     uint8_t dispCode;
@@ -116,11 +145,33 @@ public:
     SenvilleAURADisp();
     ~SenvilleAURADisp();
     bool hasUpdate();
-    char *toBuff(char *buf);
+    char *toBuff(char *buf); // to json string
+    char *asciiDisplay(char *buff); // to string buffer of just desplay value converted to ascii string
+    static int alphaToInt(char *value); // convert a property str value to an integer value
     void listen(); // pin is re-defined for listening
     void listenStop(); // Stops interrupts, important for serial communication etc.
     void handler();
     void handleSynch();
+    void updateProperties(); // will cycle through and get all properties
 };
+
+#define DISP_PROPERTIES 27
+typedef struct PropertiesS {
+  char  key[DISP_MAXSTRINGPERCODE];
+  int   value;
+  PropertiesS() { /* init empty */ key[0] = 0x00 ; value = 0; }
+  PropertiesS(char *name, char *valueCode) {
+    memcpy(key,name, (strlen(name) < DISP_MAXSTRINGPERCODE * sizeof(char)
+      ? strlen(name)+1 : DISP_MAXSTRINGPERCODE * sizeof(char) ));
+    value = SenvilleAURADisp::alphaToInt(valueCode);
+    // RPM Properties
+    if(strcmp(name,_F("1F"))==0 || strcmp(name,_F("0F"))==0) {
+      value = value * 10;
+    }
+    if(strcmp(name,_F("LA"))==0) {
+      value = value * 2;
+    }
+  };
+} Properties;
 
 #endif /* SenvilleAURADisp_hpp */

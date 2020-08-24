@@ -71,7 +71,6 @@ const DisplayMapAscii SenvilleAURADisp::displayMap[] = {
     , displyMapAsciiS(0xC6, "u")
 };
 
-
 // Only one instance of this class is supported, the last
 // class to invoke listen() wins.  First class to exit disables interrupt.
 SenvilleAURADisp *lastInst;
@@ -108,6 +107,7 @@ SenvilleAURADisp::SenvilleAURADisp() {
 SenvilleAURADisp::~SenvilleAURADisp() {
     lastInst = 0;
 }
+
 void SenvilleAURADisp::listen() {
     //define pin modes
     attachInterrupt(digitalPinToInterrupt(CLK_HSPI), ISRDispHandler, RISING);
@@ -152,6 +152,58 @@ char *SenvilleAURADisp::toBuff(char *buf) {
     APND_CHARBUFF(pos,buf,"%s\"", displayBytetoAscii(displayBuff[DISP_CHAR2]))
     APND_CHARBUFF(pos,buf,", " STAT_ONTME ":%ld }", millis())
     return buf;
+}
+char *SenvilleAURADisp::asciiDisplay(char *buf) {
+  int pos = 0;
+  sprintf(buf,"%s", displayBytetoAscii(displayBuff[DISP_CHAR1]));
+  APND_CHARBUFF(pos,buf,"%s", displayBytetoAscii(displayBuff[DISP_CHAR2]))
+  return buf;
+}
+//
+/*
+  * -- Meaning of values below : (specialized semi-hex display scheme that 'cheats' three characters for neg & 100's)
+  *          -1F, -1E, -1d, -1c, -1b, -1A are similarly meaning -25, -24, -23, -22, -21, and -20 in deg.C
+  *          -19 to -10 are in deg.C
+  *          -9 to -1 are in deg.C
+  *          00 to 99 are in deg.C
+  *          A0 to A9 are 100-109 in deg.C
+  *          b0 to b9 are 110-119 in deg.C
+  *          c0 to c9 are 120-129 in deg.C
+  *          d0 to d9 are 130-139 in deg.C
+  *          E0 to E9 are 140-149 in deg.C
+  *          F0 to F9 are 150-159 in deg.C
+ */
+int SenvilleAURADisp::alphaToInt(char *value) {
+  int values[DISP_MAXSTRINGPERCODE];
+  int i = strlen(value);
+  int level = 0, sign = 1;
+  for(; i > 0; i--) {
+    switch(value[i-1]) {
+      case 'a': case 'A': values[level] = 10 * (level==1?10:1); break;
+      case 'b': case 'B': values[level] = 11 * (level==1?10:1); break;
+      case 'c': case 'C': values[level] = 12 * (level==1?10:1); break;
+      case 'd': case 'D': values[level] = 13 * (level==1?10:1); break;
+      case 'e': case 'E': values[level] = 14 * (level==1?10:1); break;
+      case 'f': case 'F': values[level] = 15 * (level==1?10:1); break;
+      case '-': sign = -1; values[level] = 0; break;
+      case ' ': values[level] = 0 * (level==1?10:1); break;
+      case '0': values[level] = 0 * (level==1?10:1); break;
+      case '1': values[level] = 1 * (level==1?10:1); break;
+      case '2': values[level] = 2 * (level==1?10:1); break;
+      case '3': values[level] = 3 * (level==1?10:1); break;
+      case '4': values[level] = 4 * (level==1?10:1); break;
+      case '5': values[level] = 5 * (level==1?10:1); break;
+      case '6': values[level] = 6 * (level==1?10:1); break;
+      case '7': values[level] = 7 * (level==1?10:1); break;
+      case '8': values[level] = 8 * (level==1?10:1); break;
+      case '9': values[level] = 9 * (level==1?10:1); break;
+    }
+    // Debug statement
+    //Serial.printf("#:%d %c %d\n",i,value[i-1], values[level]);
+    //
+    level++;
+  }
+  return sign * (values[0] + (level > 1? values[1] : 0) + (level > 2 ? values[2]:0) );
 }
 // Read next bit - flag when full byte ready
 void SenvilleAURADisp::handler() {
