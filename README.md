@@ -4,11 +4,11 @@ Yet another IR Library for HVAC related systems -- with a twist.  The decoding o
 
 Yes, with these measurements, diagnostics of issues with the unit are as simple as looking at your thermostat.  Also, only thing missing from calculating total efficiency of the unit in real time is a sensor on the current supply.  There are other separate current sensor projects out there, someone is gonna put them together (please let me know if you do!)
 
-NOTE: This is by no means a complete project.  At best, it is fun experimentation only.  For instance, if the ESP8266 crashes, what is the default heat pump setting?  There isn't one right now.  Use on your equipment is entirely your responsibility.  This library is currently being used on my heat pump unit BUT, it is still in the research phase.  Use at your own risk. (Note: I've been able to plug and un-plug this board whilst the unit is on witout problems [pics: see wiki])
+NOTE: This is by no means a complete project.  At best, it is fun experimentation only.  If the ESP8266 crashes, the last run setting is saved and it is restored on reboot. Use on your equipment is entirely your responsibility.  This library is currently being used on my heat pump unit BUT, it is still in the research phase.  Use at your own risk. (Note: I've been able to plug and un-plug this board whilst the unit is on witout problems [pics: see wiki])
 
 The project is GPL V2.0 which means I share, you share.  Pull requests are welcome.  For instance, I'd love to get more sample data to verify the undocumented measurements (You'll see what is currently known documented in the header file for SenvilleAURADisp.hpp).  Especially for these reserved codes, there is likely to be some variation across brands so there is work in building up a matrix there.
 
-To add your own brand/model of heat pump / AC unit, it is expected that you'd use IRHVACLink class directly, mess with parameters passed to it, then add your own new class, similar to SenvilleAURA class, to encapsulate the specifics of your model.  The SenvilleAURADisp class is still very much in research mode and its applicability/extension for other models remains to be seen.
+To add your own brand/model of heat pump / AC unit, it is expected that you'd use IRHVACLink class directly, mess with parameters passed to it, then add your own new class, similar to SenvilleAURA class, to encapsulate the specifics of your model.  The SenvilleAURADisp class is still in research mode and its applicability/extension for other models remains to be seen.
 
 Check out the wiki for pics. of a test rig. https://github.com/kpishere/homie_heatPump/wiki
 
@@ -61,4 +61,6 @@ There is a new target, `sming_headpump` (see: [Sming](https://sminghub.github.io
 
 ## Upcoming
 
-Will be continuing with monitoring data collection from operation of unit and with validated measurements, adding a property(ies) to the MQTT stream for these values.
+Will be continuing with monitoring data collection from operation of unit and with validated measurements, adding a property(ies) to the MQTT stream for these values. Progress on the display class and accessing properties has been made.  To make this faster though, there was a pause in the project to add OTA update capability (was doing too much running from office to furnace!).  This is very close to working.
+
+
