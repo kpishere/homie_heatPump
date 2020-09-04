@@ -165,7 +165,7 @@ typedef struct PropertiesS {
       ? strlen(name)+1 : DISP_MAXSTRINGPERCODE * sizeof(char) ));
     value = SenvilleAURADisp::alphaToInt(valueCode);
     // RPM Properties
-    if(strcmp(name,_F("1F"))==0 || strcmp(name,_F("0F"))==0) {
+    if(strcmp(name,_F("IF"))==0 || strcmp(name,_F("0F"))==0) {
       value = value * 10;
     }
     if(strcmp(name,_F("LA"))==0) {
