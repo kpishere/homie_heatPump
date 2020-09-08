@@ -252,22 +252,25 @@ void publish() {
       , capturePropertyIndex, lastPropertyUpdate, (long)(PROPERTY_SCAN_AT_TIME * 1e3));
       strVal = String((const char *)displayBuff);
       mqtt->publish(_F(MQTT_DEBUG_PATH), strVal);
-    }
-    // Publish values at same time
-    if( capturePropertyIndex == 0 ) { // Publish only when not scanning
-      sprintf(displayBuff,"{");
-      for(int i = 0; i<DISP_PROPERTIES; i++ ) {
-        int pos = strlen(displayBuff);
-        if( String((char *)properties[i].key).length()>0) {
-          sprintf(&(displayBuff)[(pos)],"%s:%d%s",(char *)properties[i].key,properties[i].value,( (i < DISP_PROPERTIES-1)?", ":""));
-        }
-      }
-      int pos = strlen(displayBuff); sprintf(&(displayBuff)[(pos)],"}");
-      strVal = String((const char *)displayBuff);
-      mqtt->publish(_F(MQTT_PROPERTIES_PATH), strVal);
 
-      lastPropertyUpdate = millis();
+      // Publish values at same time
+      //if( capturePropertyIndex == 0 )
+      { // Publish only when not scanning
+        sprintf(displayBuff,"{");
+        for(int i = 0; i<DISP_PROPERTIES; i++ ) {
+          int pos = strlen(displayBuff);
+          if( String((char *)properties[i].key).length()>0) {
+            sprintf(&(displayBuff)[(pos)],"%s:%d%s",(char *)properties[i].key,properties[i].value,( (i < DISP_PROPERTIES-1)?", ":""));
+          }
+        }
+        int pos = strlen(displayBuff); sprintf(&(displayBuff)[(pos)],"}");
+        strVal = String((const char *)displayBuff);
+        mqtt->publish(_F(MQTT_PROPERTIES_PATH), strVal);
+
+        lastPropertyUpdate = millis();
+      }
     }
+
     updateFlags = UpdateProperty::None;
 }
 
@@ -279,35 +282,30 @@ void scan()
 
   // Check display hardware
   if(disp->hasUpdate()) {
-#ifdef DEBUG
-    Serial.print("scan ");
     disp->toBuff((char *)displayBuff);
-    Serial.println((const char *)displayBuff);
-#endif
     if(initiatePropertyCapture == 0
       && capturePropertyIndex > 0
       && capturePropertyIndex < DISP_PROPERTIES
     ) {
-      disp->asciiDisplay((char *)displayBuff);
-      if(strcmp(displayBuff, String(PropertyLabels[capturePropertyIndex-1]).c_str()) == 0) {
+      char localbuf[DISPLAY_BYTE_SIZE];
+      disp->asciiDisplay((char *)localbuf);
+      capturePropertyIndex = PropertyLabels.indexOf(localbuf,true);
+      if(capturePropertyIndex >= 0) {
         // Validate expected label
-        properties[capturePropertyIndex-1] = PropertiesS(displayBuff,0);
+        properties[capturePropertyIndex] = PropertiesS(displayBuff,0);
         timeOfLabelCapture = millis();
       } else {
         String strVal;
 
-        strVal = String((const char *)displayBuff);
+        strVal = String((const char *)localbuf);
         mqtt->publish(_F(MQTT_DEBUG_PATH), strVal);
 
         // Wait some time before reading value
         if( (millis() - timeOfLabelCapture) > DISPLAY_IR_SCAN_INTERVAL * 3 ) {
-          strVal = String((const char *)displayBuff);
-          mqtt->publish(_F(MQTT_DEBUG_PATH), strVal);
           // If not expected label, it is value (if not spaces), set it and increment to next property
-          if(strcmp(displayBuff, _F("  ")) != 0) {
-            properties[capturePropertyIndex-1] = PropertiesS((char *)String(PropertyLabels[capturePropertyIndex-1]).c_str()
-              , displayBuff );
-            capturePropertyIndex++;
+          if(strcmp(localbuf, _F("  ")) != 0) {
+            properties[capturePropertyIndex] = PropertiesS((char *)String(PropertyLabels[capturePropertyIndex]).c_str()
+              , localbuf );
             // Send command to increment to next
             sprintf(controlBuff,OPTION_CMD,Option::Led);
             senville->fromJsonBuff(controlBuff, byteMsgBuf);
@@ -315,9 +313,8 @@ void scan()
           }
         }
       }
-    } else {
-      updateFlags |= UpdateProperty::Display;
     }
+    updateFlags |= UpdateProperty::Display;
   }
 
   // Check IR Link hardware
@@ -348,6 +345,7 @@ void scan()
   if((thisUpdate - lastUpdate) >= (DEFAULT_UPDATE_INTERVAL * 1e3) || lastUpdate == 0) {
     updateFlags = UpdateProperty::All;
   }
+#ifdef AUTO_PROPERTY_CAPTURE
   // Initiate property capture cycle
   if( (capturePropertyIndex == 0 || capturePropertyIndex >= DISP_PROPERTIES)
     && ( (thisUpdate - lastPropertyUpdate) >= (PROPERTY_SCAN_AT_TIME * 1e3) || lastPropertyUpdate == 0 )) {
@@ -366,6 +364,7 @@ void scan()
     irSendFromMsgBuffer(byteMsgBuf);
     initiatePropertyCapture--;
   }
+#endif
   // Re-connect if needed and publish to MQTT
 	if(mqtt != nullptr && mqtt->getConnectionState() != eTCS_Connected) {
 		startMqttClient(); // Auto reconnect
