@@ -4,7 +4,12 @@
 //  Hardware layer implementation of IR pulse signaling
 //
 #include "IRLink.hpp"
+#ifdef SMING
 #include <HardwareTimer.h>
+#else
+#endif
+
+
 #if defined(__AVR__)
 #else // defined(ESP8266)
 #include <pins_arduino.h>
@@ -53,10 +58,18 @@ int volatile tc1_ptr;
 
 // Only one instance of this class is supported, the last
 // class to invoke listen() wins.  First class to exit disables interrupt.
-IRLink *lastInstance;
+IRLink *lastInstance = nullptr;
+#ifdef SMING
 void IRAM_ATTR ISRHandler() {
     if(lastInstance) lastInstance->handler();
 }
+#else
+void ISRHandler() {
+    if(lastInstance) lastInstance->handler();
+}
+#endif
+
+
 
 // Timer compare A interrup service routine
 #if defined(__AVR__)
@@ -379,9 +392,10 @@ uint8_t *IRLink::loop_chkMsgReceived() {
                         i += config->msgSyncCnt;
                     }
                 }
-            } else { // Non-compliant message, reset
+            } else { // Non-compliant message, reset, start listening again
                 bitInMsg = 0;
                 result = NULL;
+                this->listen();
             }
         }
         received = false;

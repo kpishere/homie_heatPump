@@ -6,10 +6,10 @@
 #define IRLink_hpp
 
 #include <stdio.h>
-#ifdef ARDUINO_LIBRARIES
-#include "Arduino.h"
-#else
+#ifdef SMING
 #include <SmingCore.h>
+#else
+#include "Arduino.h"
 #endif
 
 #if defined(__AVR__)
@@ -61,11 +61,13 @@ typedef struct IRPulseLengthUsS {
         val = _val;
     }
     char *display(char *buf, int &pos) {
+      #ifdef DEBUG
         pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",val);
         pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",lo);
         pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",hi);
         pos = strlen(buf);
-        return buf;
+      #endif // DEBUG
+      return buf;
     }
 } IRPulseLengthUs;
 
@@ -80,6 +82,7 @@ typedef struct IRConfigS {
     IRPulseLengthUs bitOneLength;
     IRPulseLengthUs msgBreakLength;
     char *display(char *buf) {
+      #ifdef DEBUG
         int pos = 0;
         sprintf(buf,"\nsamples ");
         pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",msgSamplesCnt);
@@ -95,6 +98,7 @@ typedef struct IRConfigS {
         pos = strlen(buf); sprintf(&(buf)[(pos)],"\none ");bitOneLength.display(buf, pos);
         pos = strlen(buf); sprintf(&(buf)[(pos)],"\nbrk ");msgBreakLength.display(buf, pos);
         pos = strlen(buf);
+      #endif // DEBUG
         return buf;
     }
 } IRConfig;

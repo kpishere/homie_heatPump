@@ -2,11 +2,12 @@
 #define IRNECRemote_hpp
 
 #include <stdio.h>
-#ifdef ARDUINO_LIBRARIES
-#include "Arduino.h"
-#else
+#ifdef SMING
 #include <SmingCore.h>
+#else
+#include "Arduino.h"
 #endif
+
 #include "IRLink.hpp"
 
 // Command message
@@ -33,7 +34,7 @@ typedef struct irMsgS {
         sprintf(buf,"\nmsg.addr ");
         pos = strlen(buf); sprintf(&(buf)[(pos)],"%0d ", addr);
         pos = strlen(buf); sprintf(&(buf)[(pos)],"\nmsg.cmd ");
-        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",cmd);        
+        pos = strlen(buf); sprintf(&(buf)[(pos)],"%d ",cmd);
         pos = strlen(buf);
         return buf;
     }
